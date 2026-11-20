@@ -1,15 +1,11 @@
 <template>
-  <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
-    <div>
-      <h1 class="text-lg font-semibold text-ink-gray-9">Details</h1>
-      <p class="text-xs text-ink-gray-5">Assignments, attachments, tags and sharing — the same as on the standard form.</p>
-    </div>
+  <PageFrame subtitle="Assignments, attachments, tags and sharing — the same as on the standard form.">
 
     <div v-if="!details" class="p-10 text-center text-sm text-ink-gray-5">Loading…</div>
 
     <div v-else class="grid gap-4 lg:grid-cols-2">
       <!-- Record -->
-      <section class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
+      <section class="rounded-xl border border-outline-gray-2 bg-surface-base p-4">
         <h2 class="mb-3 text-sm font-semibold text-ink-gray-9">Record</h2>
         <dl class="grid grid-cols-[120px_1fr] gap-y-2 text-sm">
           <dt class="text-ink-gray-5">Plan</dt>
@@ -31,7 +27,7 @@
       </section>
 
       <!-- Assigned to -->
-      <section class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
+      <section class="rounded-xl border border-outline-gray-2 bg-surface-base p-4">
         <h2 class="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-gray-9"><Icon name="user" :size="14" /> Assigned to</h2>
         <ul class="mb-3 flex flex-col gap-1.5">
           <li v-for="person in details.assignees" :key="person.name" class="flex items-center gap-2 rounded-md bg-surface-gray-1 px-2.5 py-1.5 text-sm">
@@ -47,7 +43,7 @@
       </section>
 
       <!-- Tags -->
-      <section class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
+      <section class="rounded-xl border border-outline-gray-2 bg-surface-base p-4">
         <h2 class="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-gray-9"><Icon name="tag" :size="14" /> Tags</h2>
         <div class="mb-3 flex flex-wrap gap-1.5">
           <span v-for="tag in details.tags" :key="tag" class="inline-flex items-center gap-1 rounded-full bg-surface-gray-2 px-2.5 py-0.5 text-xs text-ink-gray-8">
@@ -57,13 +53,13 @@
           <span v-if="!details.tags.length" class="text-sm text-ink-gray-5">No tags.</span>
         </div>
         <form v-if="details.can.write" class="flex gap-2" @submit.prevent="addTag">
-          <input v-model="tag" class="h-8 flex-1 rounded-md border border-outline-gray-3 px-2.5 text-sm outline-none focus:border-outline-blue-3" placeholder="Add a tag…" />
+          <input v-model="tag" class="cp-input flex-1" placeholder="Add a tag…" />
           <Button type="submit" :disabled="!tag.trim()">Add</Button>
         </form>
       </section>
 
       <!-- Shared with -->
-      <section class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
+      <section class="rounded-xl border border-outline-gray-2 bg-surface-base p-4">
         <h2 class="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-gray-9"><Icon name="share" :size="14" /> Shared with</h2>
         <ul class="mb-3 flex flex-col gap-1.5">
           <li v-for="person in details.shared" :key="person.user" class="flex items-center gap-2 rounded-md bg-surface-gray-1 px-2.5 py-1.5 text-sm">
@@ -83,7 +79,7 @@
       </section>
 
       <!-- Attachments -->
-      <section class="rounded-lg border border-outline-gray-2 bg-surface-white p-4 lg:col-span-2">
+      <section class="rounded-xl border border-outline-gray-2 bg-surface-base p-4 lg:col-span-2">
         <div class="mb-3 flex items-center justify-between">
           <h2 class="flex items-center gap-2 text-sm font-semibold text-ink-gray-9"><Icon name="paperclip" :size="14" /> Attachments</h2>
           <Button v-if="details.can.write" size="sm" :loading="uploading" @click="picker.click()">
@@ -106,10 +102,11 @@
         </ul>
       </section>
     </div>
-  </div>
+  </PageFrame>
 </template>
 
 <script setup>
+import PageFrame from '../components/PageFrame.vue'
 import { inject, onMounted, ref, watch } from 'vue'
 import { Avatar, Badge, Button, toast } from 'frappe-ui'
 import Icon from '../components/Icon.vue'

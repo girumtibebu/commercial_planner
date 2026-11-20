@@ -3,7 +3,6 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils import flt
 
 from commercial_planning.api import planning as planning_api
-from commercial_planning.api import version as version_api
 from commercial_planning.tests.test_conversions import sales_order_from, submitted_quotation
 
 VERSION = "Commercial Planning Version"
@@ -28,21 +27,22 @@ class TestProjects(IntegrationTestCase):
 		order = sales_order_from(quotation)
 		return plan, order
 
-	def test_project_adds_a_budget_version_that_becomes_budget_on_approval(self):
+	def test_project_joins_the_plan_without_a_new_version(self):
 		plan, order = self.planned_order()
 		project = make_project(order)
-		plan_doc = frappe.get_doc(PLAN, plan)
-		self.assertEqual((plan_doc.project, plan_doc.current_stage), (project.name, "Project"))
-		so_version, budget = (frappe.get_doc(VERSION, f"{plan}-V0{n}") for n in (2, 3))
-		self.assertEqual((so_version.status, budget.status), ("Frozen", "Working"))
-		self.assertEqual((budget.stage, budget.purpose, budget.template, budget.created_from_version), ("Project", "Budget", "Project Budget", so_version.name))
-		self.assertEqual((budget.source_doctype, budget.source_name), ("Sales Order", order.name))  # selling still comes from the order
-		self.assertEqual(flt(budget.total_selling), flt(order.net_total))
-		self.assertFalse(budget.reference_role)  # a budget needs Management approval first
-		version_api.approve(budget.name)
-		plan_doc = frappe.get_doc(PLAN, plan)
-		self.assertEqual((plan_doc.budget_version, plan_doc.current_stage), (budget.name, "Execution"))
+		self.assertEqual(frappe.db.get_value(PLAN, plan, "project"), project.name)
+		self.assertEqual(frappe.db.count(VERSION, {"planning": plan}), 2)  # the Sales Order version stays the budget
 		self.assertEqual(planning_api.open_for("Project", project.name), plan)
+
+	def test_submitting_the_sales_order_makes_the_agreed_budget_and_project(self):
+		plan, order = self.planned_order()
+		order.submit()
+		agreed = frappe.get_doc(VERSION, f"{plan}-V02")
+		self.assertEqual((agreed.status, agreed.lock_kind, agreed.version_name), ("Frozen", "Agreed", "Agreed budget"))
+		project = frappe.db.get_value("Project", {"sales_order": order.name})
+		self.assertTrue(project)
+		self.assertEqual(frappe.db.get_value(PLAN, plan, "project"), project)
+		self.assertEqual(flt(agreed.total_selling), flt(order.net_total))
 
 	def test_project_without_a_sales_order_starts_an_empty_plan(self):
 		project = make_project(name="Standalone project")
@@ -57,4 +57,4 @@ class TestProjects(IntegrationTestCase):
 		first = make_project(order, "First")
 		make_project(order, "Second")
 		self.assertEqual(frappe.db.get_value(PLAN, plan, "project"), first.name)
-		self.assertEqual(frappe.db.count(VERSION, {"planning": plan}), 3)
+		self.assertEqual(frappe.db.count(VERSION, {"planning": plan}), 2)

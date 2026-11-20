@@ -12,6 +12,7 @@ export function makeFormatter(currency) {
     compact: (value) => (value == null ? '—' : compact.format(value)),
     money: (value) => (value == null ? '—' : number.format(value)),
     percent: (value) => (value == null ? '—' : `${value.toFixed(1)}%`),
+    date: (value) => (value ? new Date(`${value}T00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''),
     signed: (value) =>
       value == null ? '—' : `${value > 0 ? '+' : ''}${number.format(value)}`,
   }

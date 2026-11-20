@@ -2,8 +2,8 @@
   <label class="grid gap-1 text-sm">
     <span class="text-ink-gray-6">{{ label }}</span>
     <div
-      class="flex h-8 items-center rounded-md border border-outline-gray-3 bg-surface-white px-2.5"
-      :class="editing ? 'border-outline-blue-3' : 'cursor-pointer hover:border-outline-gray-4'"
+      class="cp-input flex items-center"
+      :class="editing ? '!border-outline-gray-4' : disabled ? 'cursor-not-allowed !bg-surface-gray-1' : 'cursor-pointer'"
       @click="start"
     >
       <LinkInput v-if="editing" :doctype="doctype" :initial="modelValue || ''" @commit="commit" @cancel="editing = false" />

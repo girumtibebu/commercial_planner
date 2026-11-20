@@ -22,6 +22,8 @@ COST_SOURCES = (
 	"Internal Rate",
 	"Stock Valuation",
 	"Subcontract",
+	"LTA Price",
+	"Supplier Quotation",
 )
 
 STAGES = ("Quotation", "Sales Order", "Project", "Execution")

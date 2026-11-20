@@ -3,7 +3,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 
-from commercial_planning.services import selling, tree
+from commercial_planning.services import pricing, selling, tree
 from commercial_planning.services import version as version_service
 
 FROZEN = ("Frozen", "Approved")
@@ -50,5 +50,6 @@ class CommercialPlanningVersion(Document):
 		else:
 			selling.refresh_totals(self)  # selling is re-read only on request, never silently
 		tree.recalculate(self)
+		pricing.check_overrides(self)
 		self.total_profit = flt(self.total_selling) - flt(self.total_cost)
 		self.margin_pct = self.total_profit / self.total_selling * 100 if flt(self.total_selling) else 0

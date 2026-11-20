@@ -9,14 +9,12 @@
     v-if="ws"
     v-model="createOpen"
     :versions="ws.versions"
-    :templates="ws.templates"
-    :stages="ws.stages"
-    :purposes="ws.purposes"
     :default-from="focusVersion?.name"
     :preset="createFrom"
     :apply-changes="createApply"
     @create="onCreate"
   />
+  <DocPanel :target="panelTarget" :desk-path="deskPath" :fmt="fmt" @close="panelTarget = null" @changed="load" />
   <ToastProvider />
 </template>
 
@@ -26,6 +24,7 @@ import { useRouter } from 'vue-router'
 import { ToastProvider } from 'frappe-ui'
 import AppShell from './components/AppShell.vue'
 import CreateVersionDialog from './components/CreateVersionDialog.vue'
+import DocPanel from './components/DocPanel.vue'
 import { api } from './api'
 import { makeFormatter } from './format'
 import { useWorkspace } from './useWorkspace'
@@ -66,7 +65,15 @@ function goToDesk() {
   window.location.href = target ? deskPath(target.doctype, target.name) : '/desk'
 }
 
-provide('cp', { planName, origin, fmt, openCreate, goToDesk, deskPath, ...workspace })
+/** Linked documents open in a side panel; documents without one open in Desk. */
+const PANEL_DOCTYPES = ['Quotation', 'Sales Order', 'Request for Quotation', 'Supplier Quotation', 'Purchase Order', 'Project']
+const panelTarget = ref(null)
+function openPanel(doctype, name) {
+  if (PANEL_DOCTYPES.includes(doctype)) panelTarget.value = { doctype, name }
+  else window.open(deskPath(doctype, name), '_blank')
+}
+
+provide('cp', { planName, origin, fmt, openCreate, goToDesk, deskPath, openPanel, ...workspace })
 
 onMounted(async () => {
   await load()

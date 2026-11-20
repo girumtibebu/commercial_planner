@@ -3,3 +3,7 @@ commercial_planning.patches.v0_2.rename_revision_to_version
 
 [post_model_sync]
 commercial_planning.patches.v0_2.migrate_versions
+commercial_planning.patches.v2_0.split_pricing_basis
+commercial_planning.patches.v2_0.lock_kinds
+commercial_planning.patches.v2_0.client_line_rates
+commercial_planning.patches.v2_0.manual_default

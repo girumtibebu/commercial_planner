@@ -3,9 +3,9 @@
 import frappe
 from frappe.utils import flt
 
-from commercial_planning.services import permissions
+from commercial_planning.services import columns as grid_columns
+from commercial_planning.services import permissions, quote_sync, revisions
 from commercial_planning.services import sync as sync_service
-from commercial_planning.services import version as version_service
 
 VERSION = "Commercial Planning Version"
 IDENTITY = ("row_key", "parent_key", "row_type", "description")
@@ -17,6 +17,13 @@ VALUE_FIELDS = (
 	"supplier",
 	"vendor_quote",
 	"qty",
+	"days",
+	"pages",
+	"rate",
+	"off_quotation",
+	"changed_in_quotation",
+	"after_agreement",
+	"variation_order",
 	"uom",
 	"unit_cost",
 	"cost_currency",
@@ -25,6 +32,22 @@ VALUE_FIELDS = (
 	"adj_percent",
 	"cost_amount",
 	"selling_amount",
+	"pricing_basis",
+	"cost_center",
+	"rfq",
+	"supplier_quotation",
+	"purchase_order",
+	"settlement",
+	"important",
+	"line_kind",
+	"rental_item",
+	"variance_qty",
+	"variance_reason",
+	"allowance_pct",
+	"price_override_reason",
+	"important_cost",
+	"allowance_amount",
+	"suggested_selling",
 )
 VERSION_FIELDS = (
 	"name",
@@ -33,6 +56,13 @@ VERSION_FIELDS = (
 	"stage",
 	"purpose",
 	"status",
+	"lock_kind",
+	"lock_reason",
+	"round_no",
+	"is_revision",
+	"revision_status",
+	"approval_reasons",
+	"reject_reason",
 	"reference_role",
 	"template",
 	"reason",
@@ -75,6 +105,7 @@ def get_workspace(plan, versions=None):
 		"versions": [describe_version(ver) for ver in all_versions],
 		"columns": [column_for(ver) for ver in selected],
 		"rows": merged_rows(selected),
+		"grid_columns": {"available": grid_columns.available(), "chosen": grid_columns.chosen()},
 		"actuals": actual_totals(doc, selected),
 		"summary": summary(doc, all_versions),
 		"sync": sync_status(selected),
@@ -102,14 +133,24 @@ def sync_status(selected):
 	return status
 
 
+def reference_version(all_versions):
+	"""The last number committed to the client: the Agreed budget once won, else the latest submitted round."""
+	for kind in ("Agreed", "Round"):
+		found = [ver for ver in all_versions if ver.lock_kind == kind]
+		if found:
+			return found[-1]
+	return None
+
+
 def pick_columns(doc, all_versions, requested):
-	"""Requested versions; else the reference versions (baseline, budget, forecast) plus the latest."""
+	"""Requested versions; else the reference version (latest round / Agreed budget) plus the latest one."""
 	by_name = {ver.name: ver for ver in all_versions}
 	if requested:
 		return [by_name[name] for name in requested if name in by_name]
-	pointers = version_service.get_pointers(doc.name)
-	names = [pointers["baseline_version"], pointers["budget_version"], pointers["forecast_version"]]
-	chosen = {name for name in names if name in by_name}
+	chosen = set()
+	reference = reference_version(all_versions)
+	if reference:
+		chosen.add(reference.name)
 	if all_versions:
 		chosen.add(all_versions[-1].name)
 	return sorted((by_name[name] for name in chosen), key=lambda ver: ver.version_no)
@@ -145,20 +186,21 @@ def describe_version(ver):
 	return dict(ver) | {
 		"label": version_label(ver),
 		"can_edit": permissions.can_edit_version(doc),
-		"can_freeze": permissions.can_freeze_version(doc),
-		"can_approve": permissions.can_approve_version(doc),
-		"can_reopen": permissions.can_reopen_version(doc),
-		"can_set_role": {role: permissions.can_set_role(doc, role) for role in version_service.ROLES},
+		# client lines and the draft Quotation are one: their fields are edited here only while this is true
+		"syncs_quotation": bool(quote_sync.active_quotation(doc)),
+		"can_approve": ver.revision_status == "Needs approval" and revisions.can_approve(),
 	}
 
 
 def column_for(ver):
+	named = ver.lock_kind in ("Round", "Agreed")  # "Round 2", "Agreed budget" read better than "V4"
 	return {
 		"version": ver.name,
 		"key": f"v{ver.version_no}",
 		"label": version_label(ver),
-		"short": f"V{ver.version_no}",
-		"role": ver.reference_role,
+		"short": ver.version_name if named else f"V{ver.version_no}",
+		"role": None,
+		"lock_kind": ver.lock_kind,
 		"status": ver.status,
 	}
 
@@ -180,8 +222,15 @@ def merged_rows(selected):
 	priority = list(reversed(selected))
 	per_version = {}
 	children = {}
+	fields = [col["key"] for col in grid_columns.item_fields()]
 	for ver in priority:
 		rows = version_rows(ver.name)
+		doc = frappe.get_doc(VERSION, ver.name)
+		linked = {link.row_key for link in doc.item_links}
+		items = grid_columns.item_values(doc, fields)
+		for row in rows:
+			row.linked = row.row_key in linked
+			row.item = items.get(row.row_key)
 		per_version[ver.name] = {row.row_key: row for row in rows}
 		children[ver.name] = {}
 		for row in rows:
@@ -226,7 +275,7 @@ def walk(parent_key, depth, priority, per_version, children, output):
 
 
 def strip_identity(row):
-	return {field: row.get(field) for field in VALUE_FIELDS}
+	return {field: row.get(field) for field in VALUE_FIELDS + ("linked", "item")}
 
 
 def actual_totals(doc, selected):
@@ -255,34 +304,60 @@ def actual_totals(doc, selected):
 
 
 def summary(doc, all_versions):
-	pointers = version_service.get_pointers(doc.name)
-	by_name = {ver.name: ver for ver in all_versions}
-	baseline = by_name.get(pointers["baseline_version"])
-	budget = by_name.get(pointers["budget_version"])
-	forecast = by_name.get(pointers["forecast_version"])
-	current = all_versions[-1] if all_versions else None  # selling follows the most recent version
-	selling = flt(current.total_selling) if current else 0
-	costs = {
-		"quotation": flt(baseline.total_cost) if baseline else None,
-		"budget": flt(budget.total_cost) if budget else None,
-		"forecast": flt(forecast.total_cost) if forecast else None,
-		"actual": flt(doc.actual_cost) if doc.actual_cost else None,
-	}
-	profit = {key: (selling - cost if cost is not None else None) for key, cost in costs.items()}
-	margin = {key: (value / selling * 100 if value is not None and selling else None) for key, value in profit.items()}
+	"""Price, Estimate (the newest version), the reference committed to the client, and the job's spending.
+
+	Before winning the reference is the latest round; after, the Agreed budget, and Ordered / Spent / Left apply."""
+	latest = all_versions[-1] if all_versions else None
+	reference = reference_version(all_versions)
+	won = bool(reference and reference.lock_kind == "Agreed")
+	if won:  # after winning: the Estimate is the latest approved revision; a draft revision is shown on its own
+		latest = next((v for v in reversed(all_versions) if v.revision_status == "Approved"), reference)
+	selling = flt(latest.total_selling) if latest else 0
+	estimate = flt(latest.total_cost) if latest else 0
+	ordered = flt(
+		frappe.db.sql(
+			"select sum(amount) from `tabCommercial Planning Actual` where planning=%s and basis='Committed'", doc.name
+		)[0][0]
+	)
+	spent = flt(doc.actual_cost)
+	totals = revisions.agreed_totals(doc.name) if won else None
+	agreed = totals["cost"] if totals else None
+	if totals:
+		selling = totals["price"]  # the original agreement plus agreed variations
 	return {
 		"selling": selling,
-		"costs": costs,
-		"profit": profit,
-		"margin": margin,
-		"variance": {
-			"budget_vs_quotation": diff(costs["budget"], costs["quotation"]),
-			"forecast_vs_budget": diff(costs["forecast"], costs["budget"]),
-			"actual_vs_forecast": diff(costs["actual"], costs["forecast"]),
-			"actual_vs_quotation": diff(costs["actual"], costs["quotation"]),
-		},
+		"estimate": estimate,
+		"profit": selling - estimate,
+		"margin": (selling - estimate) / selling * 100 if selling else None,
+		"won": won,
+		"reference": {
+			"name": reference.name,
+			"label": reference.version_name,
+			"kind": reference.lock_kind,
+			"cost": flt(reference.total_cost),
+			"selling": flt(reference.total_selling),
+			"margin": flt(reference.margin_pct),
+		}
+		if reference
+		else None,
+		"agreed": agreed,
+		"ordered": ordered,
+		"spent": spent,
+		"left": agreed - ordered - spent if won else None,
+		"estimate_version": latest.name if latest else None,
+		"variations": revisions.variations(doc.name) if won else {},
+		"pending_revision": next((v.name for v in all_versions if v.revision_status == "Needs approval"), None),
+		# what was offered at each round and what was agreed: the negotiation in numbers
+		"history": [
+			{
+				"name": ver.name,
+				"label": ver.version_name,
+				"kind": ver.lock_kind,
+				"selling": flt(ver.total_selling),
+				"cost": flt(ver.total_cost),
+				"margin": flt(ver.margin_pct),
+			}
+			for ver in all_versions
+			if ver.lock_kind in ("Round", "Agreed")
+		],
 	}
-
-
-def diff(left, right):
-	return None if left is None or right is None else left - right

@@ -11,6 +11,13 @@
   "purpose",
   "column_break_a",
   "status",
+  "lock_kind",
+  "lock_reason",
+  "round_no",
+  "is_revision",
+  "revision_status",
+  "approval_reasons",
+  "reject_reason",
   "reference_role",
   "template",
   "created_from_version",
@@ -90,6 +97,27 @@
    "default": "Working",
    "read_only": 1,
    "in_list_view": 1
+  },
+  {
+   "fieldname": "lock_kind",
+   "fieldtype": "Select",
+   "label": "Lock Kind",
+   "options": "\nReview\nRound\nAgreed\nApproval\nRevision\nSuperseded",
+   "description": "Why the version is locked: its document is in review, it was sent to the client (Round), it is the Agreed budget, or a newer version replaced it.",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "lock_reason",
+   "fieldtype": "Data",
+   "label": "Lock Reason",
+   "read_only": 1
+  },
+  {
+   "fieldname": "round_no",
+   "fieldtype": "Int",
+   "label": "Round No",
+   "read_only": 1
   },
   {
    "fieldname": "reference_role",
@@ -242,6 +270,33 @@
    "fieldtype": "Table",
    "label": "Item Links",
    "options": "Commercial Planning Item Link"
+  },
+  {
+   "fieldname": "is_revision",
+   "fieldtype": "Check",
+   "label": "Budget Revision",
+   "read_only": 1,
+   "description": "Made after the Sales Order was submitted"
+  },
+  {
+   "fieldname": "revision_status",
+   "fieldtype": "Select",
+   "label": "Revision Status",
+   "options": "\nDraft\nNeeds approval\nApproved",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "approval_reasons",
+   "fieldtype": "Small Text",
+   "label": "Needs Approval Because",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reject_reason",
+   "fieldtype": "Small Text",
+   "label": "Rejected Because",
+   "read_only": 1
   }
  ],
  "permissions": [

@@ -8,6 +8,9 @@ MANAGEMENT = "Commercial Management"
 PROJECTS_MANAGER = "Projects Manager"
 ADMIN_ROLES = (MANAGEMENT, "System Manager")
 PLAN_ROLES = (PLANNER, MANAGEMENT, PROJECTS_MANAGER, "System Manager")
+# sales marks the important lines of a BOQ; it does not edit the lines themselves
+SALES_ROLES = ("Sales Manager", "Sales User")
+SALES_FIELDS = ("important",)
 
 # Used when a version has no template (ad-hoc versions).
 STAGE_EDITORS = {
@@ -80,3 +83,16 @@ def require(condition, message):
 
 def require_edit(version):
 	require(can_edit_version(version), _("You cannot edit {0}").format(version.name))
+
+
+def is_sales_only(ops):
+	"""True when every operation only marks lines as important."""
+	return bool(ops) and all(
+		op.get("op") == "update" and set((op.get("values") or {}).keys()) <= set(SALES_FIELDS) for op in ops
+	)
+
+
+def require_edit_ops(version, ops):
+	if is_sales_only(ops) and version.status == EDITABLE_STATUS and has_any_role(SALES_ROLES + PLAN_ROLES):
+		return
+	require_edit(version)
