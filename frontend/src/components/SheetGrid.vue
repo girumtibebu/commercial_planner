@@ -594,7 +594,8 @@ function cellClasses(row, col, colIndex) {
   return [
     ALIGN[col.align],
     col.number ? 'is-number' : '',
-    isActive ? 'is-active' : '',
+    isActive && !editable ? 'is-active' : '', // locked or calculated: a grey tint only
+    isActive && editable ? 'is-outlined' : '', // editable: an outline says "type here"
     isEditing(row, col) ? 'is-editing !bg-surface-base' : '',
     colIndex === 0 ? 'sheet-frozen' : '',
     colIndex === 0 && active.value.key === row.row_key ? 'is-row-active' : '',

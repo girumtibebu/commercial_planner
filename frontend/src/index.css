@@ -80,6 +80,13 @@ input[type='checkbox']:disabled {
   z-index: 3;
 }
 
+/* the selected editable cell: an inset outline, so it shows on any row colour */
+.sheet-cell.is-outlined {
+  outline: 2px solid var(--outline-gray-3, oklch(83% 0 0));
+  outline-offset: -2px;
+  z-index: 3;
+}
+
 .sheet-cell.is-editing {
   background-color: rgba(0, 0, 0, 0.05) !important;
   z-index: 4;
