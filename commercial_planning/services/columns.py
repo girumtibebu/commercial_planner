@@ -20,7 +20,7 @@ BUILTIN = {
 	"uom": ("UOM", 84, "Both", 0),
 	"rate": ("Rate", 112, "Client lines", 1),
 	"unit_cost": ("Unit cost", 112, "Both", 1),
-	"cost": ("Cost", 124, "Both", 1),
+	"cost": ("Total cost", 124, "Both", 1),
 	"delta": ("vs reference", 112, "Both", 1),
 	"supplier": ("Supplier", 150, "Cost lines", 0),
 	"ordered": ("Ordered", 110, "Both", 0),  # shown by the After win view; zeros before winning are noise
@@ -93,9 +93,11 @@ def item_values(version, fields):
 
 
 def set_item_field(version, row_key, field, value):
-	"""Write one Quotation Item column from the planner to the draft Quotation."""
+	"""The planner no longer writes Quotation items: client lines are changed in the Quotation, then synced."""
 	from commercial_planning.services import quote_sync
 
+	if quote_sync.active_quotation(version):
+		frappe.throw(_("Quotation items are changed in the Quotation, then synced here"))
 	spec = next((col for col in item_fields() if col["key"] == field), None)
 	if not spec or not spec["editable"]:
 		frappe.throw(_("{0} is not an editable planner column").format(field))

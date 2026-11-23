@@ -36,7 +36,8 @@
               :id="'cp-col-' + col.key"
               type="checkbox"
               :checked="isShown(col.key)"
-              :disabled="col.key === 'description'"
+              :disabled="col.key === 'description' || columns.fixed.includes(col.key)"
+              :title="columns.fixed.includes(col.key) ? 'Always shown' : ''"
               @change="toggle(col.key)"
             />
             <label :for="'cp-col-' + col.key" class="flex-1 cursor-pointer text-ink-gray-8">{{ col.label }}</label>
@@ -66,6 +67,7 @@ const ordered = computed(() => {
 })
 
 function toggle(key) {
+  if (props.columns.fixed.includes(key)) return // always shown
   const current = props.columns.chosen.value
   props.columns.setChoice(isShown(key) ? current.filter((col) => col.key !== key) : [...current, { key }])
 }

@@ -50,8 +50,8 @@ def refresh_selling(revision, row_keys=None):
 		if row_keys is None or row.row_key in row_keys:
 			row.selling_amount = selling.get(row.row_key, 0)
 			if row.row_type == "Category" and not row.parent_key and row.row_key not in linked:
-				# a client line not (yet) on a document: its price is what was typed
-				row.selling_amount = flt(row.qty) * (flt(row.days) or 1) * (flt(row.pages) or 1) * flt(row.rate)
+				# a client line not (yet) on a document: its price is what was typed; one removed from its Quotation sells nothing
+				row.selling_amount = 0 if row.off_quotation else flt(row.qty) * (flt(row.days) or 1) * (flt(row.pages) or 1) * flt(row.rate)
 	refresh_totals(revision)
 
 

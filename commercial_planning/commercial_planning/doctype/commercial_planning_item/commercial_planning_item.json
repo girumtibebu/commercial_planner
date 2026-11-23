@@ -46,18 +46,7 @@
   "supplier_quotation",
   "purchase_order",
   "po_item",
-  "settlement",
-  "boq_section",
-  "important",
-  "line_kind",
-  "rental_item",
-  "variance_qty",
-  "variance_reason",
-  "allowance_pct",
-  "price_override_reason",
-  "important_cost",
-  "allowance_amount",
-  "suggested_selling"
+  "settlement"
  ],
  "fields": [
   {
@@ -343,74 +332,6 @@
    "label": "Variation Sales Order",
    "options": "Sales Order",
    "read_only": 1
-  },
-  {
-   "fieldname": "boq_section",
-   "fieldtype": "Section Break",
-   "label": "BOQ (internal costing)"
-  },
-  {
-   "fieldname": "important",
-   "fieldtype": "Check",
-   "label": "Important for price",
-   "description": "Sales marks lines that matter for the price: sourced or large variance. Sub-hire and outsourced lines are always important."
-  },
-  {
-   "fieldname": "line_kind",
-   "fieldtype": "Select",
-   "label": "Line kind",
-   "options": "\nInventory\nSub-hire\nOutsourced\nSmall item"
-  },
-  {
-   "fieldname": "rental_item",
-   "fieldtype": "Link",
-   "label": "Rental item",
-   "options": "Item",
-   "description": "Inventory item that the rental request books."
-  },
-  {
-   "fieldname": "variance_qty",
-   "fieldtype": "Float",
-   "label": "Variance qty",
-   "description": "Quantity the warehouse or technical team changed from the BOQ."
-  },
-  {
-   "fieldname": "variance_reason",
-   "fieldtype": "Small Text",
-   "label": "Variance reason"
-  },
-  {
-   "fieldname": "allowance_pct",
-   "fieldtype": "Percent",
-   "label": "Small items allowance %",
-   "description": "Client line only. Blank uses the default in Commercial Planning Settings."
-  },
-  {
-   "fieldname": "price_override_reason",
-   "fieldtype": "Small Text",
-   "label": "Price override reason",
-   "description": "Client line only. Needed when the client price is further from the suggested price than the tolerance."
-  },
-  {
-   "fieldname": "important_cost",
-   "fieldtype": "Currency",
-   "label": "Important cost",
-   "options": "currency",
-   "read_only": 1
-  },
-  {
-   "fieldname": "allowance_amount",
-   "fieldtype": "Currency",
-   "label": "Small items allowance",
-   "options": "currency",
-   "read_only": 1
-  },
-  {
-   "fieldname": "suggested_selling",
-   "fieldtype": "Currency",
-   "label": "Suggested price",
-   "options": "currency",
-   "read_only": 1
   }
  ],
  "permissions": [],
@@ -418,6 +339,5 @@
  "sort_order": "DESC",
  "states": [],
  "istable": 1,
- "editable_grid": 1,
- "modified": "2026-11-17 12:00:00.000000"
+ "editable_grid": 1
 }

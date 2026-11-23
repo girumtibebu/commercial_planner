@@ -27,14 +27,6 @@ EDITABLE_FIELDS = (
 	"adj_mode",
 	"adj_percent",
 	"pricing_basis",
-	# BOQ: internal costing, set by the technical team and sales
-	"important",
-	"line_kind",
-	"rental_item",
-	"variance_qty",
-	"variance_reason",
-	"allowance_pct",
-	"price_override_reason",
 )
 # a client line's own fields: they are the Quotation item, so they change only where the Quotation allows it
 CLIENT_FIELDS = ("description", "item_code", "qty", "days", "pages", "rate")
@@ -340,13 +332,6 @@ def op_duplicate(revision, tree, op, created):
 			tree.attach(copy, copies[original.parent_key].row_key)
 
 
-def op_back_on_quotation(revision, tree, op, created):
-	"""A greyed "not on quotation" client line goes back: the sync adds a new Quotation item for it."""
-	row = tree.get(op["row_key"])
-	row.off_quotation = 0
-	row.changed_in_quotation = 0
-
-
 def op_split(revision, tree, op, created):
 	"""Splitting a line made it a sub-category; the plan keeps two levels, so add lines to the category instead."""
 	frappe.throw(_("Lines cannot be split. Add another line to the category instead"))
@@ -393,7 +378,6 @@ OPERATIONS = {
 	"outdent": op_outdent,
 	"duplicate": op_duplicate,
 	"split": op_split,
-	"back_on_quotation": op_back_on_quotation,
 	"set_links": op_set_links,
 	"sync_source": op_sync_source,
 	"refresh_source": op_refresh_source,
@@ -417,9 +401,6 @@ def recalculate(revision):
 	view = Tree(revision)
 	total = group_cost(view, "")
 	derive_category_fields(revision, view)
-	from commercial_planning.services import pricing
-
-	pricing.refresh_pricing(revision, view)
 	revision.total_cost = total
 	return total
 

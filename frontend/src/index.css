@@ -162,11 +162,14 @@ input[type='checkbox']:disabled {
   box-shadow: inset 2px 0 0 #7c7c7c;
 }
 
-.sheet-frozen {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.06);
+/* the first column stays in view on tablets and larger; on a phone the whole grid scrolls sideways */
+@media (min-width: 768px) {
+  .sheet-frozen {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    box-shadow: 1px 0 0 rgba(0, 0, 0, 0.06);
+  }
 }
 
 .sheet-cell input {

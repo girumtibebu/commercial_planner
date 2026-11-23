@@ -38,16 +38,6 @@ VALUE_FIELDS = (
 	"supplier_quotation",
 	"purchase_order",
 	"settlement",
-	"important",
-	"line_kind",
-	"rental_item",
-	"variance_qty",
-	"variance_reason",
-	"allowance_pct",
-	"price_override_reason",
-	"important_cost",
-	"allowance_amount",
-	"suggested_selling",
 )
 VERSION_FIELDS = (
 	"name",
@@ -105,6 +95,7 @@ def get_workspace(plan, versions=None):
 		"versions": [describe_version(ver) for ver in all_versions],
 		"columns": [column_for(ver) for ver in selected],
 		"rows": merged_rows(selected),
+		"sections": sections(selected),
 		"grid_columns": {"available": grid_columns.available(), "chosen": grid_columns.chosen()},
 		"actuals": actual_totals(doc, selected),
 		"summary": summary(doc, all_versions),
@@ -113,6 +104,31 @@ def get_workspace(plan, versions=None):
 		"stages": frappe.get_all("Commercial Version Stage", pluck="name", order_by="creation asc"),
 		"purposes": frappe.get_all("Commercial Version Purpose", pluck="name", order_by="creation asc"),
 	}
+
+
+def sections(selected):
+	"""{client row_key: section title}: each section row of a version's Quotation / Sales Order (emc_utils'
+	is_section) heads the client line of the next item. The newest displayed version wins."""
+	found = {}
+	for ver in selected:
+		child = f"{ver.source_doctype} Item"
+		if not ver.source_name or not frappe.db.exists("DocType", child) or not frappe.get_meta(child).has_field("is_section"):
+			continue
+		items = frappe.get_all(
+			child,
+			{"parent": ver.source_name, "parenttype": ver.source_doctype},
+			["name", "is_section", "section_title", "item_name"],
+			order_by="idx asc",
+		)
+		row_of = {link.link_name: link.row_key for link in frappe.get_doc(VERSION, ver.name).item_links}
+		pending = []
+		for item in items:
+			if item.is_section:
+				pending.append(item.section_title or item.item_name)
+			elif pending and item.name in row_of:
+				found[row_of[item.name]] = " · ".join(pending)
+				pending = []
+	return found
 
 
 def templates():

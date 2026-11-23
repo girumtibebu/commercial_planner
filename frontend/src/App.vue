@@ -14,6 +14,7 @@
     :apply-changes="createApply"
     @create="onCreate"
   />
+  <SettingsDialog v-model="settingsOpen" />
   <DocPanel :target="panelTarget" :desk-path="deskPath" :fmt="fmt" @close="panelTarget = null" @changed="load" />
   <ToastProvider />
 </template>
@@ -25,6 +26,7 @@ import { ToastProvider } from 'frappe-ui'
 import AppShell from './components/AppShell.vue'
 import CreateVersionDialog from './components/CreateVersionDialog.vue'
 import DocPanel from './components/DocPanel.vue'
+import SettingsDialog from './components/SettingsDialog.vue'
 import { api } from './api'
 import { makeFormatter } from './format'
 import { useWorkspace } from './useWorkspace'
@@ -73,7 +75,10 @@ function openPanel(doctype, name) {
   else window.open(deskPath(doctype, name), '_blank')
 }
 
-provide('cp', { planName, origin, fmt, openCreate, goToDesk, deskPath, openPanel, ...workspace })
+const settingsOpen = ref(false)
+const openSettings = () => (settingsOpen.value = true)
+
+provide('cp', { planName, origin, fmt, openCreate, goToDesk, deskPath, openPanel, openSettings, ...workspace })
 
 onMounted(async () => {
   await load()

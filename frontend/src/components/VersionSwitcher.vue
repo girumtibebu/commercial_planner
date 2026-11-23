@@ -16,7 +16,7 @@
 
     <div
       v-if="open"
-      class="absolute right-0 top-10 z-50 w-[340px] rounded-xl border border-outline-gray-2 bg-surface-base p-1.5 shadow-xl"
+      class="fixed inset-x-3 top-14 z-50 rounded-xl border border-outline-gray-2 bg-surface-base p-1.5 shadow-xl md:absolute md:inset-x-auto md:right-0 md:top-10 md:w-[340px]"
     >
       <div class="px-2 pb-1 pt-1 text-[13px] text-ink-gray-5">Versions</div>
       <div class="max-h-[340px] overflow-y-auto">

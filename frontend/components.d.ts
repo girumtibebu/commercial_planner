@@ -24,6 +24,7 @@ declare module 'vue' {
     QuotationActions: typeof import('./src/components/QuotationActions.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SettingsDialog: typeof import('./src/components/SettingsDialog.vue')['default']
     SheetGrid: typeof import('./src/components/SheetGrid.vue')['default']
     SummaryPanel: typeof import('./src/components/SummaryPanel.vue')['default']
     SupplierPicker: typeof import('./src/components/SupplierPicker.vue')['default']

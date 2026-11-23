@@ -51,13 +51,21 @@
           Added after agreement
         </div>
         <div
+          v-if="!row.parent_key && ws.sections?.[row.row_key]"
+          class="sheet-cell sticky left-0 flex items-center gap-2 border-t-2 border-outline-gray-3 bg-surface-gray-1 font-semibold text-ink-gray-9"
+          :style="{ gridColumn: '1 / -1' }"
+          title="A section of the Quotation (edit it there)"
+        >
+          <span class="cp-chip border border-outline-gray-3 text-ink-gray-6">Section</span>
+          {{ ws.sections[row.row_key] }}
+        </div>
+        <div
           v-for="(col, index) in cols"
           :key="row.row_key + col.key"
           :data-cell="row.row_key + ':' + col.key"
           class="sheet-cell"
           :class="cellClasses(row, col, index)"
           @mousedown="col.key !== 'actions' && onCellMouseDown(row, col, $event)"
-          @dblclick="col.key !== 'actions' && beginEdit(row, col)"
           @mouseenter="hoverKey = row.row_key"
           @dragover="onDragOver(row, $event)"
           @drop="onDrop(row, $event)"
@@ -175,7 +183,7 @@
         v-for="(col, index) in cols"
         :key="'t' + col.key"
         class="sheet-head sticky bottom-0 z-10 flex h-9 items-center border-t border-outline-gray-2 bg-surface-gray-1 px-3 text-sm font-semibold text-ink-gray-9"
-        :class="[ALIGN[col.align], index === 0 ? 'sheet-frozen z-20' : '']"
+        :class="[ALIGN[col.align], index === 0 ? 'sheet-frozen z-20' : '', totalTone(col)]"
       >
         {{ totalFor(col) }}
       </div>
@@ -189,7 +197,7 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Button, Dropdown, toast } from 'frappe-ui'
 import { useRouter } from 'vue-router'
 import Icon from './Icon.vue'
@@ -230,8 +238,8 @@ const canEdit = computed(() => Boolean(props.focus?.can_edit))
 
 /* ------------------------------------------------------------------ columns */
 const BANDS = {
-  line: { label: 'Plan line', tone: 'bg-surface-gray-2 text-ink-gray-6' },
-  sourcing: { label: 'Sourcing', tone: 'bg-surface-gray-2 text-ink-gray-7' },
+  line: { label: 'Plan line', tone: 'bg-surface-base text-ink-gray-6' },
+  sourcing: { label: 'Sourcing', tone: 'bg-surface-base text-ink-gray-6' },
   cost: { label: 'Internal cost', tone: 'bg-surface-amber-2 text-ink-amber-8' },
   selling: { label: 'Client selling', tone: 'bg-surface-blue-2 text-ink-blue-8' },
   result: { label: 'Result', tone: 'bg-surface-green-2 text-ink-green-8' },
@@ -242,6 +250,8 @@ const BANDS = {
    on the server, so it follows them across devices. Three ready views fill the choice in one click. */
 const MIN_WIDTH = 56
 
+/** The price and result columns are always shown: no user can hide them, and a saved choice or view cannot drop them. */
+const FIXED_COLUMNS = ['unit_cost', 'rate', 'cost', 'selling', 'profit', 'margin']
 const available = computed(() => props.ws.grid_columns?.available || [])
 const choice = ref(null) // [{ key, width? }] or null = the admin's defaults
 watch(() => props.ws.grid_columns?.chosen, (saved) => { if (choice.value == null && saved) choice.value = saved }, { immediate: true })
@@ -251,6 +261,7 @@ const chosen = computed(() => {
   const list = choice.value || available.value.filter((col) => col.shown).map((col) => ({ key: col.key }))
   const picked = list.filter((entry) => known.has(entry.key))
   if (!picked.some((entry) => entry.key === 'description')) picked.unshift({ key: 'description' })
+  for (const key of FIXED_COLUMNS) if (known.has(key) && !picked.some((entry) => entry.key === key)) picked.push({ key })
   return picked.map((entry) => ({ ...known.get(entry.key), width: entry.width || known.get(entry.key).width }))
 })
 
@@ -293,7 +304,15 @@ function resetWidth(col) {
 }
 
 const liveWidths = ref({}) // while dragging, before the choice is saved
-const cols = computed(() => baseCols.value.map((col) => ({ ...col, width: liveWidths.value[col.key] ?? col.width })))
+// On a phone the description takes less room, so the numbers beside it are visible as the grid scrolls sideways
+const phone = ref(window.matchMedia('(max-width: 767px)').matches)
+const phoneQuery = window.matchMedia('(max-width: 767px)')
+const onPhone = (event) => (phone.value = event.matches)
+phoneQuery.addEventListener('change', onPhone)
+onBeforeUnmount(() => phoneQuery.removeEventListener('change', onPhone))
+const cols = computed(() =>
+  baseCols.value.map((col) => ({ ...col, width: liveWidths.value[col.key] ?? (phone.value && col.key === 'description' ? 200 : col.width) })),
+)
 
 /** One chosen column becomes one grid column (or, for "cost", one per version on screen). */
 function expand(col) {
@@ -440,7 +459,7 @@ function applies(row, col) {
 }
 
 /** Client fields of a linked client line belong to the document: editable while the draft Quotation syncs. */
-const clientEditable = (row) => Boolean(props.focus?.syncs_quotation || !valuesIn(row, focusName.value)?.linked)
+const clientEditable = (row) => !props.focus?.syncs_quotation && !valuesIn(row, focusName.value)?.linked
 
 function lockedHint(row, col) {
   if (col.key === 'unit_cost' && isQuoteLine(row)) return 'Priced from the RFQ: pick a supplier quote in Sourcing'
@@ -546,13 +565,21 @@ function totalFor(col) {
   return ''
 }
 
+/** Profit and margin in the total row take the same red / green as the item rows. */
+function totalTone(col) {
+  const latest = props.ws.versions.find((v) => v.name === latestVersion.value)
+  const value = col.key === 'profit' ? latest?.total_profit : col.key === 'margin' ? latest?.margin_pct : null
+  if (value == null) return ''
+  return value < 0 ? '!text-ink-red-6' : value > 0 ? '!text-ink-green-8' : ''
+}
+
 /* ----------------------------------------------------------------- classes */
 function isEditable(row, col) {
   if (!canEdit.value || col.type === 'readonly') return false
   if (!valuesIn(row, focusName.value) || !applies(row, col)) return false
   if (row.row_type === 'Category' && ['uom', 'unit_cost'].includes(col.key)) return false
   if (isClientLine(row) && CLIENT_COLS.includes(col.key) && !clientEditable(row)) return false
-  if (col.itemField) return isClientLine(row) && Boolean(props.focus?.syncs_quotation && valuesIn(row, focusName.value)?.linked)
+  if (col.itemField) return false // Quotation item columns are changed in the Quotation
   if (row.row_type !== 'Category' && ['rate', 'pages'].includes(col.key)) return false
   if (row.row_type === 'Adjustment' && ['qty', 'uom', 'days'].includes(col.key)) return false
   if (col.key === 'unit_cost' && (isQuoteLine(row) || isLtaLine(row))) return false
@@ -571,7 +598,7 @@ function cellClasses(row, col, colIndex) {
     isEditing(row, col) ? 'is-editing !bg-surface-base' : '',
     colIndex === 0 ? 'sheet-frozen' : '',
     colIndex === 0 && active.value.key === row.row_key ? 'is-row-active' : '',
-    hoverKey.value === row.row_key ? 'bg-surface-gray-1' : row.row_type === 'Category' ? (row.parent_key ? 'bg-surface-gray-1' : 'bg-surface-gray-2') : 'bg-surface-base',
+    row.row_type === 'Category' ? 'bg-surface-gray-1' : 'bg-surface-base', // client lines are titles like the total; breakdown rows stay white
     row.row_type === 'Category' ? 'font-semibold text-ink-gray-9' : '',
     row.row_type === 'Adjustment' ? 'italic text-ink-gray-6' : '',
     col.key.startsWith('cost:') && col.version !== focusName.value ? 'text-ink-gray-6' : '',
@@ -671,18 +698,21 @@ function scrollActiveIntoView() {
   cell?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 }
 
-/** One click edits, like a Desk child table. A click while another cell is open saves that one first. */
+/** First click selects a cell; a second click on the selected cell opens its editor. A click while another
+ *  cell is open saves that one first and only selects the new cell. */
 function onCellMouseDown(row, col, event) {
   if (isEditing(row, col)) return
-  // The editor focuses itself; without this the browser then moves focus to the grid, the editor
-  // blurs and closes again (the "opens and disappears" flicker).
-  if (isEditable(row, col)) event?.preventDefault()
-  else gridEl.value?.focus()
-  if (editing.value) document.activeElement?.blur() // save the cell being edited before moving on
-  const go = () => {
-    select(row.row_key, col.key)
-    if (isEditable(row, col)) beginEdit(row, col, undefined, true)
+  const selected = active.value.key === row.row_key && active.value.col === col.key
+  if (selected && !editing.value && isEditable(row, col)) {
+    // The editor focuses itself; without this the browser then moves focus to the grid, the editor
+    // blurs and closes again (the "opens and disappears" flicker).
+    event?.preventDefault()
+    beginEdit(row, col, undefined, true)
+    return
   }
+  if (!isEditable(row, col)) gridEl.value?.focus()
+  if (editing.value) document.activeElement?.blur() // save the cell being edited before moving on
+  const go = () => select(row.row_key, col.key)
   if (editing.value) setTimeout(go, 0) // the open editor's blur saves it first
   else go()
 }
@@ -925,7 +955,10 @@ async function addRow(values, { asChild, topLevel } = {}) {
 }
 
 const addLine = () => addRow({ row_type: 'Cost Item' })
-const addCategory = () => addRow({ row_type: 'Category' }, { topLevel: true })
+const addCategory = () => {
+  if (props.focus?.syncs_quotation) return toast.error('Client lines come from the Quotation: add them there, then Sync')
+  addRow({ row_type: 'Category' }, { topLevel: true })
+}
 
 const sendFor = (op) => props.send(focusName.value, [op])
 
@@ -976,9 +1009,6 @@ function rowMenu(row) {
   if (isCategory && !row.parent_key && anyValue(row, 'after_agreement') && !anyValue(row, 'variation_order') && props.ws.plan.can_write) {
     items.push({ label: 'Bill to client…', onClick: () => billToClient(row) })
   }
-  if (valuesIn(row, focusName.value)?.off_quotation && props.focus?.syncs_quotation) {
-    items.push({ label: 'Put back on quotation', onClick: () => sendFor({ op: 'back_on_quotation', row_key: row.row_key }) })
-  }
   items.push(
     { label: 'Move up', onClick: () => act(row, () => moveRow(-1)) },
     { label: 'Move down', onClick: () => act(row, () => moveRow(1)) },
@@ -996,7 +1026,7 @@ watch(
 )
 
 defineExpose({
-  columns: { available, chosen, setChoice, applyView, views: VIEWS },
+  columns: { available, chosen, setChoice, applyView, views: VIEWS, fixed: FIXED_COLUMNS },
   activeRow,
   addLine,
   addCategory,

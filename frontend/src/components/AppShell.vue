@@ -5,7 +5,7 @@
     <!-- Sidebar on desktop and tablet, slide-over drawer on mobile -->
     <aside
       class="flex h-full shrink-0 border-r border-outline-gray-1 transition-transform duration-200"
-      :class="[isMobile ? 'fixed inset-y-0 left-0 z-50 shadow-2xl' : '', isMobile && !drawerOpen ? '-translate-x-full' : '']"
+      :class="[isMobile ? 'fixed inset-y-0 left-0 z-50 shadow-2xl' : 'relative', isMobile && !drawerOpen ? '-translate-x-full' : '']"
     >
       <Sidebar v-model:collapsed="collapsed" :disable-collapse="isMobile">
         <div class="px-2">
@@ -41,6 +41,14 @@
           <SidebarCollapseToggle v-if="!isMobile" />
         </div>
       </Sidebar>
+      <!-- click the sidebar's edge to collapse it or open it again -->
+      <button
+        v-if="!isMobile"
+        class="absolute inset-y-0 -right-1 z-10 w-2 hover:bg-surface-gray-3"
+        :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        @click="collapsed = !collapsed"
+      />
     </aside>
 
     <div class="flex min-w-0 flex-1 flex-col">
@@ -127,7 +135,7 @@ import QuotationActions from './QuotationActions.vue'
 import VersionSwitcher from './VersionSwitcher.vue'
 import { PAGES } from '../router'
 
-const { ws, planName, origin, saving, goToDesk, deskPath, openCreate, openPanel } = inject('cp')
+const { ws, planName, origin, saving, goToDesk, deskPath, openCreate, openPanel, openSettings } = inject('cp')
 const route = useRoute()
 
 const LOGO = '/assets/commercial_planning/images/commercial_planning.svg'
@@ -193,6 +201,7 @@ const appMenu = computed(() => [
           })),
         ],
       },
+      { label: 'Settings', icon: 'lucide-settings', onClick: openSettings },
       {
         label: 'Toggle Theme',
         icon: currentTheme.value === 'dark' ? 'lucide-sun' : 'lucide-moon',

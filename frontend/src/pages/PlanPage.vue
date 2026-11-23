@@ -10,12 +10,13 @@
     </div>
 
     <SyncBanner
-      v-if="!focusVersion?.syncs_quotation"
       :status="ws.sync[focusVersion?.name]"
       :editable="Boolean(focusVersion?.can_edit)"
       :source="focusVersion?.source_name || 'the document'"
+      :synced="Boolean(focusVersion?.syncs_quotation)"
       :fmt="fmt"
       class="overflow-hidden rounded-lg border"
+      @sync="syncNow"
       @newversion="openCreate(focusVersion.name, true)"
       @add="send(focusVersion.name, [{ op: 'sync_source' }])"
       @refresh="send(focusVersion.name, [{ op: 'refresh_source' }])"
@@ -48,7 +49,7 @@
 
 <script setup>
 import PageFrame from '../components/PageFrame.vue'
-import { inject, ref } from 'vue'
+import { inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { toast } from 'frappe-ui'
 import { api } from '../api'
 import { readError } from '../useWorkspace'
@@ -87,4 +88,27 @@ function openDetails(row) {
 function saveDetails({ row_key, values }) {
   send(focusVersion.value.name, [{ op: 'update', row_key, values }])
 }
+
+/** A draft Quotation's changes are shown in the banner; they are taken into the plan only on Sync now. */
+async function syncNow() {
+  try {
+    await api.syncQuotation(focusVersion.value.name)
+    await load()
+    toast.success('Plan synced with the Quotation')
+  } catch (err) {
+    toast.error(readError(err))
+  }
+}
+
+// Live: check for Quotation changes every 30 seconds, so a change made in Desk shows here without a reload.
+let syncTimer = null
+async function checkSync() {
+  try {
+    if (ws.value) ws.value.sync = await api.getSyncStatus(planName)
+  } catch {
+    // try again at the next check
+  }
+}
+onMounted(() => (syncTimer = setInterval(checkSync, 30000)))
+onBeforeUnmount(() => clearInterval(syncTimer))
 </script>

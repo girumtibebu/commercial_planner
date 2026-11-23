@@ -65,6 +65,8 @@ export const api = {
   },
 
   getSourcing: (version) => call(PREFIX + 'sourcing.get_sourcing', { version }),
+  getSyncStatus: (plan) => call(PREFIX + 'planning.sync_status', { plan }),
+  syncQuotation: (version, versions) => call(PREFIX + 'planning.sync_quotation', { version, versions: json(versions) }),
   refreshActuals: (plan) => call(PREFIX + 'actuals.refresh', { plan }),
   getQuotationState: (version) => call(PREFIX + 'sourcing.get_quotation_state', { version }),
   listSuppliers: () =>

@@ -70,13 +70,35 @@ def get_workspace(plan, versions=None):
 def apply_ops(version, ops, expected_modified=None, versions=None):
 	"""Apply row operations atomically to one Working version and return the refreshed workspace."""
 	doc = frappe.get_doc(VERSION, version)
-	permissions.require_edit_ops(doc, parse_list(ops) or [])
+	permissions.require_edit(doc)
 	if expected_modified and str(doc.modified) != str(expected_modified):
 		frappe.throw(_("This version was changed by someone else. Reload and try again."), frappe.TimestampMismatchError)
-	created = tree.apply_ops(doc, parse_list(ops) or [])
-	quote_sync.push(doc)  # client lines are the draft Quotation's items: write them through at once
+	ops = parse_list(ops) or []
+	if quote_sync.active_quotation(doc):
+		quote_sync.check_client_lines_untouched(doc, ops)  # client lines are the Quotation's; the planner only costs them
+	created = tree.apply_ops(doc, ops)
 	doc.save(ignore_version=False)  # row edits feed the activity log, also under the test runner
 	return {"created": created, "workspace": workspace.get_workspace(doc.planning, parse_list(versions))}
+
+
+@frappe.whitelist(methods=["POST"])
+def sync_quotation(version, versions=None):
+	"""Apply the draft Quotation's changes (new, removed, reordered, price, qty) to this Working version."""
+	doc = frappe.get_doc(VERSION, version)
+	permissions.require_edit(doc)
+	quotation = frappe.get_doc("Quotation", doc.source_name) if doc.source_doctype == "Quotation" and doc.source_name else None
+	if not quotation or quotation.docstatus != 0:
+		frappe.throw(_("This version does not follow a draft Quotation"))
+	quote_sync.pull(quotation)
+	return workspace.get_workspace(doc.planning, parse_list(versions))
+
+
+@frappe.whitelist()
+def sync_status(plan):
+	"""Per version: what the document has changed since the plan last took it. Read often, so it stays small."""
+	frappe.get_doc(PLAN, plan).check_permission("read")
+	names = frappe.get_all(VERSION, {"planning": plan}, pluck="name")
+	return {name: status for name, status in workspace.sync_status([frappe._dict(name=n) for n in names]).items()}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -96,13 +118,3 @@ def set_item_field(version, row_key, field, value=None, versions=None):
 	permissions.require_edit(doc)
 	columns.set_item_field(doc, row_key, field, value)
 	return {"workspace": workspace.get_workspace(doc.planning, parse_list(versions))}
-
-
-@frappe.whitelist()
-def rental_request(version):
-	"""The inventory and small-items request a version's BOQ gives the rental app, plus what it leaves out."""
-	from commercial_planning.services import rental_request as request_service
-
-	if not permissions.can_view_plans():
-		frappe.throw(_("You cannot view this plan"), frappe.PermissionError)
-	return request_service.for_version(frappe.get_doc(VERSION, version))

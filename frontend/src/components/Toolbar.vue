@@ -4,7 +4,7 @@
       <Button size="sm" @click="grid?.addLine()"><template #prefix><Icon name="plus" :size="12" /></template>Line</Button>
       <Button size="sm" @click="grid?.addCategory()"><template #prefix><Icon name="plus" :size="12" /></template>Category</Button>
       <span class="ml-1 hidden text-[11px] text-ink-gray-5 lg:inline">
-        Click a cell to edit · Enter saves · drag ⋮⋮ to reorder · Shift+Enter details
+        Click a cell to select, click again to edit · Enter saves · drag ⋮⋮ to reorder · Shift+Enter details
       </span>
     </template>
     <span v-else class="text-xs text-ink-gray-5">This version is locked. To keep planning, make a new version from it.</span>

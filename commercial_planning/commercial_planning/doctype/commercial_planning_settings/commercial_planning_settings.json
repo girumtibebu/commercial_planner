@@ -23,11 +23,7 @@
   "column_break_appr",
   "job_change_pct",
   "approver_role",
-  "default_event_days",
-  "boq_pricing_section",
-  "default_allowance_pct",
-  "margin_target_pct",
-  "price_tolerance_pct"
+  "default_event_days"
  ],
  "fields": [
   {
@@ -145,32 +141,6 @@
    "label": "Default Event Days",
    "default": "1",
    "description": "Pre-fills Days on new lines when the plan has no Event days"
-  },
-  {
-   "fieldname": "boq_pricing_section",
-   "fieldtype": "Section Break",
-   "label": "BOQ pricing"
-  },
-  {
-   "fieldname": "default_allowance_pct",
-   "fieldtype": "Percent",
-   "label": "Default small items allowance %",
-   "default": "10",
-   "description": "Share of the important cost set aside for small items."
-  },
-  {
-   "fieldname": "margin_target_pct",
-   "fieldtype": "Percent",
-   "label": "Margin target %",
-   "default": "20",
-   "description": "Demo default. Set per division before use."
-  },
-  {
-   "fieldname": "price_tolerance_pct",
-   "fieldtype": "Percent",
-   "label": "Price tolerance %",
-   "default": "5",
-   "description": "How far the client price may differ from the suggestion before a reason is needed."
   }
  ],
  "permissions": [
@@ -193,6 +163,5 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": [],
- "modified": "2026-11-17 12:00:00.000000"
+ "states": []
 }

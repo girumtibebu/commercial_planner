@@ -29,13 +29,11 @@ def sales_order_created(doc, method=None):
 
 def document_changed(doc, method=None):
 	"""Quotation / Sales Order saved while unsubmitted: its workflow may have moved into or out of review."""
-	from commercial_planning.services import lifecycle, quote_sync
+	from commercial_planning.services import lifecycle
 
 	if doc.doctype == "Sales Order" and is_variation(doc):
 		return
-	if doc.docstatus == 0:
-		if doc.doctype == "Quotation":
-			guarded(lambda: quote_sync.pull(doc))  # Desk edits reach the plan before any review lock
+	if doc.docstatus == 0:  # a Quotation's changes wait for the planner's Sync button; see sync_status
 		guarded(lambda: lifecycle.document_changed(doc))
 
 

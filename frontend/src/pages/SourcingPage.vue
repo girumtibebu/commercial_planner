@@ -19,7 +19,7 @@
 
     <div v-if="src && !src.settings.ready" class="rounded-lg border border-outline-amber-2 bg-surface-amber-1 px-4 py-2 text-sm text-ink-amber-8">
       Set the lead cost center, internal accounts and divisions in
-      <a class="underline" :href="deskPath('Commercial Planning Settings', 'Commercial Planning Settings')" target="_blank">Commercial Planning Settings</a>
+      <button class="underline" @click="openSettings">Settings</button>
       before raising orders or settling.
     </div>
     <div v-if="loadError" class="rounded-lg border border-outline-red-3 bg-surface-red-2 p-3 text-sm text-ink-red-8">{{ loadError }}</div>
@@ -320,7 +320,7 @@ import SupplierPicker from '../components/SupplierPicker.vue'
 import { api } from '../api'
 import { readError } from '../useWorkspace'
 
-const { ws, fmt, focusVersion, load, deskPath, openPanel } = inject('cp')
+const { ws, fmt, focusVersion, load, deskPath, openPanel, openSettings } = inject('cp')
 
 const src = ref(null)
 const loadError = ref(null)
