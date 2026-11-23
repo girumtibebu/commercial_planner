@@ -74,10 +74,6 @@
               <span class="lucide-columns-2 size-3" /> Comparing {{ ws.columns.length }}
             </span>
             <VersionSwitcher />
-            <Button variant="solid" :disabled="!ws.plan.can_write" @click="openCreate(null)">
-              <template #prefix><span class="lucide-plus size-4" /></template>
-              <span class="hidden sm:inline">New version</span>
-            </Button>
           </template>
         </div>
       </header>
