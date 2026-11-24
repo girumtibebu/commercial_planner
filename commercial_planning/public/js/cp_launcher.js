@@ -8,7 +8,7 @@ window.commercial_planning = window.commercial_planning || {};
 
 	cp.add_button = function (frm) {
 		if (frm.is_new() || !cp.has_access()) return;
-		frm.add_custom_button(__("Commercial Planning"), () => cp.open(frm));
+		frm.add_custom_button(__("Commercial Planner"), () => cp.open(frm), __("Planner"));
 	};
 
 	// Documents that reference a plan's Quotation, Sales Order or Project (directly or through an RFQ, PO, invoice...)
@@ -23,7 +23,7 @@ window.commercial_planning = window.commercial_planning || {};
 		frappe
 			.call({ method: "commercial_planning.api.planning.plan_for", args: { doctype: frm.doctype, name: frm.doc.name } })
 			.then((r) => {
-				if (r.message && frm.doc.name) frm.add_custom_button(__("Commercial Planning"), () => cp.open(frm));
+				if (r.message && frm.doc.name) frm.add_custom_button(__("Commercial Planner"), () => cp.open(frm), __("Planner"));
 			});
 	};
 	cp.LINKED_DOCTYPES.forEach((doctype) => frappe.ui.form.on(doctype, { refresh: (frm) => cp.add_linked_button(frm) }));
@@ -42,7 +42,7 @@ window.commercial_planning = window.commercial_planning || {};
 				const parts = [];
 				if (status.new_items?.length) {
 					const names = status.new_items.map((i) => frappe.utils.escape_html(i.label)).join(", ");
-					parts.push(__("{0} new item(s) not in Commercial Planning: {1}", [status.new_items.length, names]));
+					parts.push(__("{0} new item(s) not in Commercial Planner: {1}", [status.new_items.length, names]));
 				}
 				if (status.removed_items?.length) {
 					parts.push(__("{0} planned item(s) no longer on this document", [status.removed_items.length]));
@@ -51,7 +51,7 @@ window.commercial_planning = window.commercial_planning || {};
 					parts.push(__("qty, unit or selling price changed on {0} planned item(s)", [status.changes.length]));
 				}
 				frm.dashboard.add_comment(
-					`${parts.join(" · ")} — <a href="#" class="cp-open-plan">${__("Open Commercial Planning")}</a>`,
+					`${parts.join(" · ")} — <a href="#" class="cp-open-plan">${__("Open Commercial Planner")}</a>`,
 					"orange",
 					true
 				);
@@ -70,7 +70,7 @@ window.commercial_planning = window.commercial_planning || {};
 				method: "commercial_planning.api.planning.open_for",
 				args: { doctype: frm.doctype, name: frm.doc.name },
 				freeze: true,
-				freeze_message: __("Opening Commercial Planning..."),
+				freeze_message: __("Opening Commercial Planner..."),
 			})
 			.then((r) => {
 				const query = `?from=${encodeURIComponent(frm.doctype)}&name=${encodeURIComponent(frm.doc.name)}`;
