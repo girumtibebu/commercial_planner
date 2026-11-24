@@ -14,7 +14,6 @@ declare module 'vue' {
     AppShell: typeof import('./src/components/AppShell.vue')['default']
     ColumnPicker: typeof import('./src/components/ColumnPicker.vue')['default']
     CreateVersionDialog: typeof import('./src/components/CreateVersionDialog.vue')['default']
-    DocPanel: typeof import('./src/components/DocPanel.vue')['default']
     Icon: typeof import('./src/components/Icon.vue')['default']
     LineDetailsDialog: typeof import('./src/components/LineDetailsDialog.vue')['default']
     LinkField: typeof import('./src/components/LinkField.vue')['default']

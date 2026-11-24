@@ -1,4 +1,4 @@
-import frappe
+﻿import frappe
 
 from commercial_planning.api.planning import parse_list
 from commercial_planning.services import version as version_service
@@ -80,3 +80,29 @@ def bill_to_client(version, rows, versions=None):
 	doc = _revision(version)
 	order = revisions.bill_to_client(doc, parse_list(rows))
 	return {"sales_order": order, "workspace": refreshed(doc.planning, versions)}
+
+
+def check_deletable(version):
+	"""Core versions stay: the first version of each source (Quotation, Sales Order, Project) and any
+	Baseline, Budget or Forecast version. Custom versions can be deleted."""
+	from commercial_planning.services import permissions
+
+	doc = frappe.get_doc(VERSION, version)
+	permissions.require_edit(doc)
+	plan = frappe.get_doc("Commercial Planning", doc.planning)
+	if version in [plan.get(field) for field in version_service.ROLE_FIELD.values()]:
+		frappe.throw(frappe._("{0} is the plan's Baseline, Budget or Forecast version and cannot be deleted").format(version))
+	first_of_source = {}
+	for ver in frappe.get_all(VERSION, filters={"planning": doc.planning}, fields=["name", "source_doctype"], order_by="version_no asc"):
+		first_of_source.setdefault(ver.source_doctype, ver.name)
+	if first_of_source.get(doc.source_doctype) == version:
+		frappe.throw(frappe._("{0} is a core version ({1}) and cannot be deleted").format(version, doc.source_doctype or "plan"))
+	return doc
+
+
+@frappe.whitelist(methods=["POST"])
+def delete(version, versions=None):
+	"""Delete a custom version. Core and role versions are refused."""
+	planning = check_deletable(version).planning
+	frappe.delete_doc(VERSION, version)
+	return refreshed(planning, versions)

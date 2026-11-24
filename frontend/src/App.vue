@@ -15,7 +15,6 @@
     @create="onCreate"
   />
   <SettingsDialog v-model="settingsOpen" />
-  <DocPanel :target="panelTarget" :desk-path="deskPath" :fmt="fmt" @close="panelTarget = null" @changed="load" />
   <ToastProvider />
 </template>
 
@@ -25,7 +24,6 @@ import { useRouter } from 'vue-router'
 import { ToastProvider } from 'frappe-ui'
 import AppShell from './components/AppShell.vue'
 import CreateVersionDialog from './components/CreateVersionDialog.vue'
-import DocPanel from './components/DocPanel.vue'
 import SettingsDialog from './components/SettingsDialog.vue'
 import { api } from './api'
 import { makeFormatter } from './format'
@@ -67,12 +65,9 @@ function goToDesk() {
   window.location.href = target ? deskPath(target.doctype, target.name) : '/desk'
 }
 
-/** Linked documents open in a side panel; documents without one open in Desk. */
-const PANEL_DOCTYPES = ['Quotation', 'Sales Order', 'Request for Quotation', 'Supplier Quotation', 'Purchase Order', 'Project']
-const panelTarget = ref(null)
+/** Linked documents open in Desk, in a new tab. */
 function openPanel(doctype, name) {
-  if (PANEL_DOCTYPES.includes(doctype)) panelTarget.value = { doctype, name }
-  else window.open(deskPath(doctype, name), '_blank')
+  window.open(deskPath(doctype, name), '_blank')
 }
 
 const settingsOpen = ref(false)

@@ -1,7 +1,5 @@
 <template>
   <PageFrame subtitle="Build the internal cost behind each quotation item, compare versions, and watch the margin.">
-    <VersionBar :focus="focusVersion" :can-write="Boolean(ws.plan.can_write)" :won="Boolean(ws.summary?.won)" @new-version="(name) => openCreate(name)" />
-
     <div
       v-if="ws.plan.created_from === 'Project' && !ws.plan.sales_order"
       class="rounded-lg border border-outline-blue-1 bg-surface-blue-2 px-4 py-2 text-sm text-ink-blue-8"
@@ -24,6 +22,7 @@
 
     <SummaryPanel :summary="ws.summary" :fmt="fmt" />
 
+
     <div class="flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-xl border border-outline-gray-2 bg-surface-base">
       <Toolbar
         :editable="Boolean(focusVersion?.can_edit)"
@@ -36,6 +35,11 @@
         <SheetGrid ref="grid" :ws="ws" :focus="focusVersion" :fmt="fmt" :send="send" :set-item-field="setItemField" @details="openDetails" />
       </div>
     </div>
+
+    <label class="grid gap-1 px-1">
+      <span class="text-sm text-ink-gray-6">Notes</span>
+      <textarea v-model="notes" rows="2" class="cp-input" :disabled="!ws.plan.can_write" placeholder="Notes for this plan" @blur="saveNotes" />
+    </label>
 
     <LineDetailsDialog
       v-model="detailsOpen"
@@ -50,7 +54,7 @@
 <script setup>
 import PageFrame from '../components/PageFrame.vue'
 import { inject, onBeforeUnmount, onMounted, ref } from 'vue'
-import { toast } from 'frappe-ui'
+import { call, toast } from 'frappe-ui'
 import { api } from '../api'
 import { readError } from '../useWorkspace'
 import LineDetailsDialog from '../components/LineDetailsDialog.vue'
@@ -58,11 +62,11 @@ import SheetGrid from '../components/SheetGrid.vue'
 import SummaryPanel from '../components/SummaryPanel.vue'
 import SyncBanner from '../components/SyncBanner.vue'
 import Toolbar from '../components/Toolbar.vue'
-import VersionBar from '../components/VersionBar.vue'
 
 const { ws, planName, fmt, focusVersion, send, setItemField, load, openCreate } = inject('cp')
 
 const grid = ref(null)
+const notes = ref(ws.value?.plan.notes || '')
 const detailsOpen = ref(false)
 const detailsRow = ref(null)
 const refreshing = ref(false)
@@ -77,6 +81,17 @@ async function refreshActuals() {
     toast.error(readError(err))
   } finally {
     refreshing.value = false
+  }
+}
+
+async function saveNotes() {
+  if (notes.value === (ws.value.plan.notes || '')) return
+  try {
+    await call('frappe.client.set_value', { doctype: 'Commercial Planning', name: planName, fieldname: 'notes', value: notes.value })
+    ws.value.plan.notes = notes.value
+    toast.success('Notes saved')
+  } catch (err) {
+    toast.error(readError(err))
   }
 }
 

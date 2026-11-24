@@ -1,4 +1,4 @@
-"""Planner grid columns: an admin list in Settings (what can appear) and each user's choice (what they see)."""
+﻿"""Planner grid columns: an admin list in Settings (what can appear) and each user's choice (what they see)."""
 
 import json
 
@@ -29,6 +29,7 @@ BUILTIN = {
 	"selling": ("Selling", 124, "Both", 1),
 	"profit": ("Profit", 116, "Both", 1),
 	"margin": ("Margin", 84, "Both", 1),
+	"notes": ("Notes", 240, "Both", 1),
 }
 
 

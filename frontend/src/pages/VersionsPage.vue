@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <PageFrame subtitle="Every state of this job's plan. Versions lock when their document goes for approval or is submitted. Tick versions to compare them.">
     <template #actions>
       <Button variant="solid" :disabled="!ws.plan.can_write" @click="openCreate(null)">
@@ -129,12 +129,14 @@
 import PageFrame from '../components/PageFrame.vue'
 import { computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button, Dropdown } from 'frappe-ui'
+import { Button, Dropdown, toast } from 'frappe-ui'
+import { api } from '../api'
+import { readError } from '../useWorkspace'
 import Icon from '../components/Icon.vue'
 import { fullDate, timeAgo } from '../format'
 import { LOCK_TONE } from '../locks'
 
-const { ws, planName, fmt, focusVersion, focusOn, toggleColumn, openCreate, deskPath, openPanel } = inject('cp')
+const { ws, planName, fmt, focusVersion, focusOn, toggleColumn, openCreate, deskPath, openPanel, load } = inject('cp')
 const router = useRouter()
 
 
@@ -169,10 +171,22 @@ async function open(name) {
   router.push({ name: 'plan', params: { plan: planName } })
 }
 
+async function remove(ver) {
+  if (!window.confirm(`Delete V${ver.version_no} ${ver.version_name}? This cannot be undone.`)) return
+  try {
+    await api.deleteVersion(ver.name, ws.value.versions.map((v) => v.name))
+    await load()
+    toast.success(`Deleted V${ver.version_no}`)
+  } catch (err) {
+    toast.error(readError(err))
+  }
+}
+
 function menu(ver) {
   return [
     { label: ver.can_edit ? 'Open and edit' : 'Open', onClick: () => open(ver.name) },
     { label: `New version from V${ver.version_no}…`, onClick: () => openCreate(ver.name) },
+    ...(ver.can_edit ? [{ label: 'Delete', theme: 'red', onClick: () => remove(ver) }] : []),
   ]
 }
 </script>

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div
     ref="gridEl"
     class="sheet relative h-full overflow-auto bg-surface-base text-sm text-ink-gray-8 outline-none"
@@ -66,24 +66,12 @@
           class="sheet-cell"
           :class="cellClasses(row, col, index)"
           @mousedown="col.key !== 'actions' && onCellMouseDown(row, col, $event)"
+          @dblclick="onCellDoubleClick(row, col)"
           @mouseenter="hoverKey = row.row_key"
           @dragover="onDragOver(row, $event)"
           @drop="onDrop(row, $event)"
         >
-          <template v-if="col.key === 'actions'">
-            <div v-if="canEdit" class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100" :class="{ '!opacity-100': hoverKey === row.row_key || active.key === row.row_key }">
-              <Dropdown :options="rowMenu(row)" placement="right">
-                <button class="flex h-6 w-6 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-3" title="Row actions">
-                  <Icon name="dots" :size="14" />
-                </button>
-              </Dropdown>
-              <button class="flex h-6 w-6 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-red-2 hover:text-ink-red-6" title="Delete row" @click="act(row, remove)">
-                <Icon name="close" :size="12" />
-              </button>
-            </div>
-          </template>
-
-          <template v-else-if="isEditing(row, col)">
+          <template v-if="isEditing(row, col)">
             <LinkInput
               v-if="typeOf(row, col) === 'link'"
               :doctype="doctypeOf(row, col)"
@@ -108,7 +96,7 @@
 
           <template v-else-if="index === 0">
             <span
-              v-if="canEdit"
+              v-if="canEdit && row.row_type !== 'Category'"
               class="drag-grip -ml-2 mr-0.5 flex h-6 w-4 shrink-0 cursor-grab items-center justify-center rounded text-ink-gray-4 hover:bg-surface-gray-3 hover:text-ink-gray-7 active:cursor-grabbing"
               :class="{ 'is-visible': hoverKey === row.row_key || dragKey === row.row_key }"
               draggable="true"
@@ -119,8 +107,16 @@
             >
               <span class="lucide-grip-vertical size-3.5" />
             </span>
+          <div v-if="canEdit && row.row_type !== 'Category'" class="row-menu mr-1 flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100" @mousedown.stop :class="{ '!opacity-100': hoverKey === row.row_key || active.key === row.row_key }">
+            <Dropdown :options="rowMenu(row)" placement="right">
+              <button class="flex h-6 w-6 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-3" title="Row actions">
+                <Icon name="dots" :size="14" />
+              </button>
+            </Dropdown>
+          </div>
             <span
-              class="mr-1 flex h-5 w-5 shrink-0 cursor-pointer select-none items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-3"
+              class="flex h-5 shrink-0 select-none items-center justify-center text-ink-gray-5"
+              :class="row.hasChildren ? 'mr-1 w-5 cursor-pointer rounded hover:bg-surface-gray-3' : 'w-0'"
               :style="{ marginLeft: row.depth * 18 + 'px' }"
               @mousedown.stop.prevent="row.hasChildren && toggle(row.row_key)"
             >
@@ -243,6 +239,7 @@ const BANDS = {
   cost: { label: 'Internal cost', tone: 'bg-surface-amber-2 text-ink-amber-8' },
   selling: { label: 'Client selling', tone: 'bg-surface-blue-2 text-ink-blue-8' },
   result: { label: 'Result', tone: 'bg-surface-green-2 text-ink-green-8' },
+  notes: { label: 'Notes', tone: 'bg-surface-base text-ink-gray-6' },
   none: { label: '', tone: 'bg-surface-base' },
 }
 
@@ -251,7 +248,7 @@ const BANDS = {
 const MIN_WIDTH = 56
 
 /** The price and result columns are always shown: no user can hide them, and a saved choice or view cannot drop them. */
-const FIXED_COLUMNS = ['unit_cost', 'rate', 'cost', 'selling', 'profit', 'margin']
+const FIXED_COLUMNS = ['unit_cost', 'rate', 'cost', 'selling', 'profit', 'margin', 'notes']
 const available = computed(() => props.ws.grid_columns?.available || [])
 const choice = ref(null) // [{ key, width? }] or null = the admin's defaults
 watch(() => props.ws.grid_columns?.chosen, (saved) => { if (choice.value == null && saved) choice.value = saved }, { immediate: true })
@@ -343,16 +340,16 @@ function expand(col) {
     case 'selling': return [{ ...base, key: 'selling', number: true, align: 'right', band: 'selling' }]
     case 'profit': return [{ ...base, key: 'profit', number: true, align: 'right', band: 'result' }]
     case 'margin': return [{ ...base, key: 'margin', number: true, band: 'result' }]
+    case 'notes': return [{ ...base, key: 'notes', field: 'notes', type: 'text', align: 'left', band: 'notes' }]
     default: // a Quotation Item field from Settings
       return [{ ...base, key: 'item:' + col.key, itemField: col.key, type: col.editable ? 'text' : 'readonly', band: 'selling' }]
   }
 }
 
 // Columns keep the user's order within a band; bands keep this order so each band header shows once.
-const BAND_ORDER = ['line', 'sourcing', 'cost', 'selling', 'result']
+const BAND_ORDER = ['line', 'sourcing', 'cost', 'selling', 'result', 'notes']
 const baseCols = computed(() => [
   ...chosen.value.flatMap(expand).sort((a, b) => BAND_ORDER.indexOf(a.band) - BAND_ORDER.indexOf(b.band)),
-  { key: 'actions', label: '', width: 64, type: 'readonly', align: 'center', band: 'none' },
 ])
 
 /** Totals of recorded cost by basis (lines rolled up to their categories, plus unallocated project costs). */
@@ -378,7 +375,11 @@ const groups = computed(() => {
     if (last && last.band === col.band) last.span += 1
     else merged.push({ band: col.band, span: 1 })
   }
-  return merged.map((group) => ({ ...group, label: BANDS[group.band].label, tone: BANDS[group.band].tone }))
+  const bands = merged.map((group) => ({ ...group, label: BANDS[group.band].label, tone: BANDS[group.band].tone }))
+  // Only the first column is frozen, so its band covers just that column; the rest of the band scrolls away.
+  const [first, ...rest] = bands
+  if (first && first.span > 1) return [{ ...first, span: 1 }, { ...first, span: first.span - 1, label: "" }, ...rest]
+  return bands
 })
 
 // Every column keeps the width you set; spare room goes to the empty actions column.
@@ -609,7 +610,7 @@ function cellClasses(row, col, colIndex) {
     profit != null && profit > 0 ? 'text-ink-green-6' : '',
     col.key === 'delta' && deltaOf(row) > 0 ? '!text-ink-red-6' : '',
     col.key === 'delta' && deltaOf(row) < 0 ? 'text-ink-green-6' : '',
-    col.key === 'actions' ? 'group' : '',
+    colIndex === 0 ? 'group' : '',
     dropTarget.value?.key === row.row_key ? 'drop-' + dropTarget.value.pos : '',
     dragKey.value && (dragKey.value === row.row_key || dragAncestors.value.has(row.row_key)) ? 'is-dragging' : '',
   ]
@@ -690,6 +691,8 @@ const doctypeOf = (row, col) => (col.key === 'description' ? 'Item' : col.doctyp
 const isEditing = (row, col) => editing.value && active.value.key === row.row_key && active.value.col === col.key
 
 function select(key, colKey) {
+  // moving the selection closes any open editor, so its text cannot carry over to another cell
+  if (active.value.key !== key || active.value.col !== colKey) editing.value = false
   active.value = { key, col: colKey }
   nextTick(scrollActiveIntoView)
 }
@@ -701,10 +704,14 @@ function scrollActiveIntoView() {
 
 /** First click selects a cell; a second click on the selected cell opens its editor. A click while another
  *  cell is open saves that one first and only selects the new cell. */
+function onCellDoubleClick(row, col) {
+  if (typeOf(row, col) === 'link' && !isEditing(row, col)) beginEdit(row, col, undefined, true)
+}
+
 function onCellMouseDown(row, col, event) {
   if (isEditing(row, col)) return
   const selected = active.value.key === row.row_key && active.value.col === col.key
-  if (selected && !editing.value && isEditable(row, col)) {
+  if (selected && !editing.value && isEditable(row, col) && typeOf(row, col) !== 'link') {
     // The editor focuses itself; without this the browser then moves focus to the grid, the editor
     // blurs and closes again (the "opens and disappears" flicker).
     event?.preventDefault()

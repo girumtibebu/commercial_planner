@@ -1,4 +1,4 @@
-"""Read model for the Vue workspace: header, version columns, merged matrix and KPIs."""
+﻿"""Read model for the Vue workspace: header, version columns, merged matrix and KPIs."""
 
 import frappe
 from frappe.utils import flt
@@ -82,6 +82,7 @@ PLAN_FIELDS = (
 	"quotation",
 	"sales_order",
 	"project",
+	"notes",
 )
 
 

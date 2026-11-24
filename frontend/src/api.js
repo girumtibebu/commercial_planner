@@ -1,4 +1,4 @@
-import { call } from 'frappe-ui'
+﻿import { call } from 'frappe-ui'
 
 const PREFIX = 'commercial_planning.api.'
 
@@ -22,6 +22,7 @@ export const api = {
   savePanel: (doctype, name, values, modified) => call(PREFIX + 'panels.save_panel', { doctype, name, values: JSON.stringify(values), modified }),
   runPanelAction: (doctype, name, action) => call(PREFIX + 'panels.run_action', { doctype, name, action }),
   submitRevision: (version, versions) => call(PREFIX + 'version.submit_revision', { version, versions: json(versions) }),
+  deleteVersion: (version, versions) => call(PREFIX + 'version.delete', { version, versions: json(versions) }),
   approveRevision: (version, versions) => call(PREFIX + 'version.approve_revision', { version, versions: json(versions) }),
   rejectRevision: (version, reason, versions) => call(PREFIX + 'version.reject_revision', { version, reason, versions: json(versions) }),
   billToClient: (version, rows, versions) => call(PREFIX + 'version.bill_to_client', { version, rows: JSON.stringify(rows), versions: json(versions) }),

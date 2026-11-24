@@ -61,8 +61,8 @@ input[type='checkbox']:disabled {
 }
 
 .sheet-cell {
-  @apply border-b border-outline-gray-1;
-  height: 36px;
+  @apply border-b border-r border-outline-gray-2;
+  height: 32px;
   display: flex;
   align-items: center;
   padding: 0 12px;
@@ -133,7 +133,7 @@ input[type='checkbox']:disabled {
   width: 2px;
   height: 50%;
   border-radius: 1px;
-  background: rgba(0, 0, 0, 0.1); /* always visible, so you can see columns resize */
+  background: transparent; /* shows on header hover, so the header has no stray lines */
 }
 
 /* Row drag & drop */
@@ -281,4 +281,19 @@ select.cp-input {
 
 .cp-scroll {
   scrollbar-width: thin;
+}
+
+/* Touch screens have no hover: the row menu stays visible; drag needs a mouse, so Move up / down in the menu take over. */
+@media (hover: none) {
+  .row-menu {
+    opacity: 1 !important;
+  }
+  .drag-grip {
+    display: none;
+  }
+}
+
+/* vertical lines between columns in the header too, so header and rows line up */
+.sheet-head {
+  @apply border-r border-outline-gray-2;
 }
