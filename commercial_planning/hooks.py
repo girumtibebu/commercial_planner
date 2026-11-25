@@ -1,5 +1,5 @@
 app_name = "commercial_planning"
-app_title = "Commercial Planning"
+app_title = "Commercial Planner"
 app_publisher = "EMC"
 app_description = "Spreadsheet-style commercial planning for quotations, sales orders and projects"
 app_email = "girumtibebu@gmail.com"
