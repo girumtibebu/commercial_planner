@@ -1,4 +1,4 @@
-# Commercial Planning
+# Commercial Planner
 
 A cost planning workspace for Frappe and ERPNext. It connects the price you quote a client to the cost you plan to spend, from the first quotation to the finished project.
 
@@ -20,7 +20,7 @@ Requires Frappe and ERPNext, version 16.
 
 ```bash
 cd $PATH_TO_YOUR_BENCH
-bench get-app https://github.com/girumtibebu/commercial_planning --branch main
+bench get-app https://github.com/girumtibebu/commercial_planner --branch main
 bench --site your.site install-app commercial_planning
 ```
 
@@ -28,7 +28,7 @@ The built interface is included in the repository. You do not need to run `yarn 
 
 ## Use
 
-Open a Quotation, Sales Order or Project and click **Commercial Planning**. The workspace opens in a new tab at `/commercial-planning`.
+Open a Quotation, Sales Order or Project and click **Commercial Planner**. The workspace opens in a new tab at `/commercial-planning`.
 
 ## Develop
 
