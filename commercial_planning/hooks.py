@@ -7,7 +7,7 @@ app_license = "mit"
 
 required_apps = ["erpnext"]
 
-app_include_js = "/assets/commercial_planning/js/cp_launcher.js"
+app_include_js = "/assets/commercial_planning/js/cp_launcher_v2.js"
 
 doctype_js = {
 	"Quotation": "public/js/quotation.js",
