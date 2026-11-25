@@ -51,11 +51,13 @@ def create_plan_from_quotation(quotation_name):
 			"current_stage": "Quotation",
 		}
 	).insert()
-	template = get_template("Plan created")
-	first = new_first_version(plan.name, template, "Quotation", "Quotation", "Estimate", "Baseline")
+	first = new_first_version(plan.name, None, "Working", "Quotation", "Estimate", None)
 	first.source_doctype, first.source_name = "Quotation", quotation.name
 	import_source_items(first, "Quotation Item", quotation.items)
 	first.insert()
+	from commercial_planning.services import lifecycle
+
+	lifecycle.catch_up("Quotation", quotation.name)  # opened on a quotation already in review or submitted
 	return plan.name
 
 
@@ -118,8 +120,10 @@ def new_first_version(plan_name, template, default_name, default_stage, default_
 
 
 def import_source_items(version, link_doctype, items):
+	from commercial_planning.services.quote_sync import is_line_item
+
 	for item in items:
-		if not item.get("is_alternative"):
+		if is_line_item(item):  # section headers and alternatives are not client lines
 			add_source_item(version, link_doctype, item)
 
 
@@ -133,6 +137,9 @@ def add_source_item(version, link_doctype, item):
 	The category takes the item's qty/uom (read-only afterwards); the first line starts with the same
 	qty/uom and the item's rate as its unit cost, to be adjusted by the planner.
 	"""
+	from commercial_planning.services.quote_sync import units_from_item
+
+	qty, days, pages = units_from_item(item, link_doctype)
 	category = version.append(
 		"items",
 		{
@@ -140,7 +147,10 @@ def add_source_item(version, link_doctype, item):
 			"row_key": frappe.generate_hash(length=8),
 			"description": item.item_name or item.item_code,
 			"item_code": item.item_code,
-			"qty": item.qty,
+			"qty": qty,
+			"days": days,
+			"pages": pages,
+			"rate": item.get("rate"),
 			"uom": item.uom,
 			"source_rate": source_rate(item),
 		},
@@ -291,6 +301,10 @@ def create_version(
 	else:
 		new = copy_version(source, **fields)
 	finish_template(source, new, tpl)
+	from commercial_planning.services import revisions
+
+	if revisions.is_won(planning):  # after the Sales Order, every new version is a budget revision
+		new.db_set({"is_revision": 1, "revision_status": "Draft", "purpose": "Revision"}, update_modified=False)
 	return new
 
 
@@ -343,24 +357,28 @@ def link_sales_order(so_name):
 		)
 		return None
 	frappe.db.set_value(PLAN, plan_name, "sales_order", order.name, update_modified=False)
-	template = get_template("Sales Order created")
-	source = resolve_source(plan_name, template)
+	source = newest_version(plan_name)  # the latest thinking, which is normally the final round
 	if source:
-		convert_version(
+		new = convert_version(
 			source,
-			version_name=(template.version_name or template.template_name) if template else "Sales Order",
-			stage=template.stage if template else "Sales Order",
-			purpose=template.purpose if template else "Pricing",
+			version_name=_("Sales Order"),
+			stage="Sales Order",
+			purpose="Pricing",
 			reason=_("Created from Sales Order {0}").format(order.name),
 			source_doctype="Sales Order",
 			source_name=order.name,
 			link_map={item.quotation_item: item.name for item in order.items if item.get("quotation_item")},
-			template=template.name if template else None,
 		)
-		if template and template.freeze_source and source.status == "Working":
-			freeze(source, system=True)
+		from commercial_planning.services import lifecycle
+
+		lifecycle.supersede(source, new.name)
 	refresh_stage(plan_name)
 	return plan_name
+
+
+def newest_version(planning):
+	name = frappe.db.get_value(VERSION, {"planning": planning}, "name", order_by="version_no desc")
+	return frappe.get_doc(VERSION, name) if name else None
 
 
 def link_project(project_name):
@@ -381,20 +399,8 @@ def link_project(project_name):
 			alert=True,
 		)
 		return None
+	# v2: the Project is the operational shell; the budget is the Agreed budget saved on Sales Order submit
 	frappe.db.set_value(PLAN, plan_name, "project", project.name, update_modified=False)
-	template = get_template("Project created")
-	source = resolve_source(plan_name, template)
-	if source:
-		new = copy_version(
-			source,
-			version_name=(template.version_name or template.template_name) if template else "Project Budget",
-			stage=template.stage if template else "Project",
-			purpose=template.purpose if template else "Budget",
-			reason=_("Created from Project {0}").format(project.name),
-			template=template.name if template else None,
-			system=True,
-		)
-		finish_template(source, new, template)
 	refresh_stage(plan_name)
 	return plan_name
 
@@ -421,22 +427,22 @@ def follow_amendment(quotation_name):
 	plan_name = get_plan_for("Quotation", old_name) if old_name else None
 	if not plan_name:
 		return None
-	versions = frappe.get_all(VERSION, {"planning": plan_name}, ["name", "source_name"], order_by="version_no desc")
-	source_name = next((v.name for v in versions if v.source_name == old_name), versions[0].name)
-	source = frappe.get_doc(VERSION, source_name)
+	# v2: the next round starts from the latest version (planning may have continued after the round was sent)
+	source = newest_version(plan_name)
 	frappe.db.set_value(PLAN, plan_name, "quotation", quotation.name, update_modified=False)
-	convert_version(
+	new = convert_version(
 		source,
-		version_name=f"{source.version_name} (amended)",
-		stage=source.stage,
+		version_name=_("Working · {0}").format(quotation.name),
+		stage="Quotation",
 		purpose="Revision",
 		reason=_("Quotation amended: {0} → {1}").format(old_name, quotation.name),
 		source_doctype="Quotation",
 		source_name=quotation.name,
 		link_map=amendment_map(old_name, quotation.name),
 	)
-	if source.status == "Working":
-		freeze(source, system=True)
+	from commercial_planning.services import lifecycle
+
+	lifecycle.supersede(source, new.name)
 	return plan_name
 
 

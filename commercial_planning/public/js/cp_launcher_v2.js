@@ -8,8 +8,25 @@ window.commercial_planning = window.commercial_planning || {};
 
 	cp.add_button = function (frm) {
 		if (frm.is_new() || !cp.has_access()) return;
-		frm.add_custom_button(__("Commercial Planning"), () => cp.open(frm));
+		frm.add_custom_button(__("Commercial Planner"), () => cp.open(frm), __("Planner"));
 	};
+
+	// Documents that reference a plan's Quotation, Sales Order or Project (directly or through an RFQ, PO, invoice...)
+	// show the button only when such a plan exists; they never create one.
+	cp.LINKED_DOCTYPES = [
+		"Request for Quotation", "Supplier Quotation", "Purchase Order", "Purchase Receipt", "Purchase Invoice",
+		"Material Request", "Delivery Note", "Sales Invoice", "Payment Entry", "Journal Entry", "Task", "Timesheet",
+		"Expense Claim",
+	];
+	cp.add_linked_button = function (frm) {
+		if (frm.is_new() || !cp.has_access()) return;
+		frappe
+			.call({ method: "commercial_planning.api.planning.plan_for", args: { doctype: frm.doctype, name: frm.doc.name } })
+			.then((r) => {
+				if (r.message && frm.doc.name) frm.add_custom_button(__("Commercial Planner"), () => cp.open(frm), __("Planner"));
+			});
+	};
+	cp.LINKED_DOCTYPES.forEach((doctype) => frappe.ui.form.on(doctype, { refresh: (frm) => cp.add_linked_button(frm) }));
 
 	// Tell the user when the document has items the plan does not know about (or lost some).
 	cp.show_sync_notice = function (frm) {
@@ -25,7 +42,7 @@ window.commercial_planning = window.commercial_planning || {};
 				const parts = [];
 				if (status.new_items?.length) {
 					const names = status.new_items.map((i) => frappe.utils.escape_html(i.label)).join(", ");
-					parts.push(__("{0} new item(s) not in Commercial Planning: {1}", [status.new_items.length, names]));
+					parts.push(__("{0} new item(s) not in Commercial Planner: {1}", [status.new_items.length, names]));
 				}
 				if (status.removed_items?.length) {
 					parts.push(__("{0} planned item(s) no longer on this document", [status.removed_items.length]));
@@ -34,7 +51,7 @@ window.commercial_planning = window.commercial_planning || {};
 					parts.push(__("qty, unit or selling price changed on {0} planned item(s)", [status.changes.length]));
 				}
 				frm.dashboard.add_comment(
-					`${parts.join(" · ")} — <a href="#" class="cp-open-plan">${__("Open Commercial Planning")}</a>`,
+					`${parts.join(" · ")} — <a href="#" class="cp-open-plan">${__("Open Commercial Planner")}</a>`,
 					"orange",
 					true
 				);
@@ -53,7 +70,7 @@ window.commercial_planning = window.commercial_planning || {};
 				method: "commercial_planning.api.planning.open_for",
 				args: { doctype: frm.doctype, name: frm.doc.name },
 				freeze: true,
-				freeze_message: __("Opening Commercial Planning..."),
+				freeze_message: __("Opening Commercial Planner..."),
 			})
 			.then((r) => {
 				const query = `?from=${encodeURIComponent(frm.doctype)}&name=${encodeURIComponent(frm.doc.name)}`;

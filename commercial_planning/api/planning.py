@@ -3,7 +3,7 @@ import json
 import frappe
 from frappe import _
 
-from commercial_planning.services import permissions, sync, tree, workspace
+from commercial_planning.services import links, permissions, quote_sync, sync, tree, workspace
 from commercial_planning.services import version as version_service
 
 PLAN = "Commercial Planning"
@@ -21,12 +21,13 @@ def can_open():
 
 @frappe.whitelist()
 def open_for(doctype, name):
-	"""Return the plan a Quotation or Sales Order belongs to, creating or linking it on first use."""
+	"""Return the plan a document belongs to. A Quotation, Sales Order or Project gets one on first use;
+	any other document opens the plan it references (an RFQ, PO, invoice, delivery, payment...)."""
 	permissions.require(permissions.can_view_plans(), _("You do not have access to Commercial Planning"))
 	frappe.has_permission(doctype, "read", doc=name, throw=True)
-	if doctype not in ("Quotation", "Sales Order", "Project"):
-		frappe.throw(_("Commercial Planning for {0} is not available yet").format(doctype))
-	plan = version_service.get_plan_for(doctype, name)
+	plan = links.find_plan(doctype, name)
+	if doctype not in ("Quotation", "Sales Order", "Project") and not plan:
+		frappe.throw(_("{0} {1} is not linked to a Commercial Planning record").format(_(doctype), name))
 	if plan:
 		frappe.has_permission(PLAN, "read", doc=plan, throw=True)
 		return plan
@@ -40,6 +41,15 @@ def open_for(doctype, name):
 	if not plan:
 		frappe.throw(_("{0} could not be connected to a Commercial Planning record").format(name))
 	return plan
+
+
+@frappe.whitelist()
+def plan_for(doctype, name):
+	"""For a document form: the plan it is linked to, if the user may open it (else None)."""
+	if not permissions.can_view_plans() or not frappe.has_permission(doctype, "read", doc=name):
+		return None
+	plan = links.find_plan(doctype, name)
+	return plan if plan and frappe.has_permission(PLAN, "read", doc=plan) else None
 
 
 @frappe.whitelist()
@@ -63,6 +73,48 @@ def apply_ops(version, ops, expected_modified=None, versions=None):
 	permissions.require_edit(doc)
 	if expected_modified and str(doc.modified) != str(expected_modified):
 		frappe.throw(_("This version was changed by someone else. Reload and try again."), frappe.TimestampMismatchError)
-	created = tree.apply_ops(doc, parse_list(ops) or [])
+	ops = parse_list(ops) or []
+	if quote_sync.active_quotation(doc):
+		quote_sync.check_client_lines_untouched(doc, ops)  # client lines are the Quotation's; the planner only costs them
+	created = tree.apply_ops(doc, ops)
 	doc.save(ignore_version=False)  # row edits feed the activity log, also under the test runner
 	return {"created": created, "workspace": workspace.get_workspace(doc.planning, parse_list(versions))}
+
+
+@frappe.whitelist(methods=["POST"])
+def sync_quotation(version, versions=None):
+	"""Apply the draft Quotation's changes (new, removed, reordered, price, qty) to this Working version."""
+	doc = frappe.get_doc(VERSION, version)
+	permissions.require_edit(doc)
+	quotation = frappe.get_doc("Quotation", doc.source_name) if doc.source_doctype == "Quotation" and doc.source_name else None
+	if not quotation or quotation.docstatus != 0:
+		frappe.throw(_("This version does not follow a draft Quotation"))
+	quote_sync.pull(quotation)
+	return workspace.get_workspace(doc.planning, parse_list(versions))
+
+
+@frappe.whitelist()
+def sync_status(plan):
+	"""Per version: what the document has changed since the plan last took it. Read often, so it stays small."""
+	frappe.get_doc(PLAN, plan).check_permission("read")
+	names = frappe.get_all(VERSION, {"planning": plan}, pluck="name")
+	return {name: status for name, status in workspace.sync_status([frappe._dict(name=n) for n in names]).items()}
+
+
+@frappe.whitelist(methods=["POST"])
+def save_columns(choice):
+	"""The user's grid columns: [{key, width}] in their order."""
+	from commercial_planning.services import columns
+
+	return columns.save_choice(parse_list(choice) or [])
+
+
+@frappe.whitelist(methods=["POST"])
+def set_item_field(version, row_key, field, value=None, versions=None):
+	"""Write a Quotation Item column (such as a custom field) from the planner to the draft Quotation."""
+	from commercial_planning.services import columns
+
+	doc = frappe.get_doc(VERSION, version)
+	permissions.require_edit(doc)
+	columns.set_item_field(doc, row_key, field, value)
+	return {"workspace": workspace.get_workspace(doc.planning, parse_list(versions))}

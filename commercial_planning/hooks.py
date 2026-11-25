@@ -7,7 +7,7 @@ app_license = "mit"
 
 required_apps = ["erpnext"]
 
-app_include_js = "/assets/commercial_planning/js/cp_launcher.js"
+app_include_js = "/assets/commercial_planning/js/cp_launcher_v2.js"
 
 doctype_js = {
 	"Quotation": "public/js/quotation.js",
@@ -16,9 +16,23 @@ doctype_js = {
 }
 
 doc_events = {
-	"Quotation": {"after_insert": "commercial_planning.events.quotation_created"},
-	"Sales Order": {"after_insert": "commercial_planning.events.sales_order_created"},
+	# the plan follows these documents' workflow: review lock / unlock on save, Round / Agreed budget on submit
+	"Quotation": {
+		"after_insert": "commercial_planning.events.quotation_created",
+		"on_update": "commercial_planning.events.document_changed",
+		"on_submit": "commercial_planning.events.quotation_submitted",
+	},
+	"Sales Order": {
+		"after_insert": "commercial_planning.events.sales_order_created",
+		"on_update": "commercial_planning.events.document_changed",
+		"on_submit": "commercial_planning.events.sales_order_submitted",
+	},
 	"Project": {"after_insert": "commercial_planning.events.project_created"},
+	"Supplier Quotation": {"validate": "commercial_planning.events.supplier_quotation_validate"},
+	# actual / committed cost of plans follows these documents
+	"Purchase Order": {"on_submit": "commercial_planning.events.cost_document_changed", "on_cancel": "commercial_planning.events.cost_document_changed"},
+	"Purchase Invoice": {"on_submit": "commercial_planning.events.cost_document_changed", "on_cancel": "commercial_planning.events.cost_document_changed"},
+	"Journal Entry": {"on_submit": "commercial_planning.events.cost_document_changed", "on_cancel": "commercial_planning.events.cost_document_changed"},
 }
 
 website_route_rules = [

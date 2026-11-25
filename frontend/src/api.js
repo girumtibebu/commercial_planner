@@ -1,4 +1,4 @@
-import { call } from 'frappe-ui'
+﻿import { call } from 'frappe-ui'
 
 const PREFIX = 'commercial_planning.api.'
 
@@ -18,16 +18,18 @@ export const api = {
 
   createVersion: (args, versions) =>
     call(PREFIX + 'version.create', { ...args, versions: json(versions) }),
+  getPanel: (doctype, name) => call(PREFIX + 'panels.get_panel', { doctype, name }),
+  savePanel: (doctype, name, values, modified) => call(PREFIX + 'panels.save_panel', { doctype, name, values: JSON.stringify(values), modified }),
+  runPanelAction: (doctype, name, action) => call(PREFIX + 'panels.run_action', { doctype, name, action }),
+  submitRevision: (version, versions) => call(PREFIX + 'version.submit_revision', { version, versions: json(versions) }),
+  deleteVersion: (version, versions) => call(PREFIX + 'version.delete', { version, versions: json(versions) }),
+  approveRevision: (version, versions) => call(PREFIX + 'version.approve_revision', { version, versions: json(versions) }),
+  rejectRevision: (version, reason, versions) => call(PREFIX + 'version.reject_revision', { version, reason, versions: json(versions) }),
+  billToClient: (version, rows, versions) => call(PREFIX + 'version.bill_to_client', { version, rows: JSON.stringify(rows), versions: json(versions) }),
+  saveColumns: (choice) => call(PREFIX + 'planning.save_columns', { choice: JSON.stringify(choice) }),
+  setItemField: (version, rowKey, field, value, versions) =>
+    call(PREFIX + 'planning.set_item_field', { version, row_key: rowKey, field, value, versions: json(versions) }),
 
-  freeze: (version, versions) => call(PREFIX + 'version.freeze', { version, versions: json(versions) }),
-
-  approve: (version, versions) => call(PREFIX + 'version.approve', { version, versions: json(versions) }),
-
-  reopen: (version, reason, versions) =>
-    call(PREFIX + 'version.reopen', { version, reason, versions: json(versions) }),
-
-  setRole: (version, role, versions) =>
-    call(PREFIX + 'version.set_role', { version, role: role || '', versions: json(versions) }),
 
   logView: (plan) => call(PREFIX + 'activity.log_view', { plan }),
   getActivity: (plan, version) => call(PREFIX + 'activity.get_activity', { plan, version: version || undefined }),
@@ -44,12 +46,14 @@ export const api = {
   unshare: (plan, user) => call(PREFIX + 'details.unshare', { plan, user }),
   removeAttachment: (plan, file) => call(PREFIX + 'details.remove_attachment', { plan, file }),
 
-  async upload(plan, file) {
+  upload: (plan, file) => api.uploadTo('Commercial Planning', plan, file),
+
+  async uploadTo(doctype, docname, file) {
     const form = new FormData()
     form.append('file', file, file.name)
     form.append('is_private', '1')
-    form.append('doctype', 'Commercial Planning')
-    form.append('docname', plan)
+    form.append('doctype', doctype)
+    form.append('docname', docname)
     form.append('folder', 'Home/Attachments')
     const response = await fetch('/api/method/upload_file', {
       method: 'POST',
@@ -60,6 +64,33 @@ export const api = {
     if (!response.ok) throw new Error(`Upload failed (${response.status})`)
     return (await response.json()).message
   },
+
+  getSourcing: (version) => call(PREFIX + 'sourcing.get_sourcing', { version }),
+  getSyncStatus: (plan) => call(PREFIX + 'planning.sync_status', { plan }),
+  syncQuotation: (version, versions) => call(PREFIX + 'planning.sync_quotation', { version, versions: json(versions) }),
+  refreshActuals: (plan) => call(PREFIX + 'actuals.refresh', { plan }),
+  getQuotationState: (version) => call(PREFIX + 'sourcing.get_quotation_state', { version }),
+  listSuppliers: () =>
+    call('frappe.client.get_list', {
+      doctype: 'Supplier',
+      fields: ['name', 'supplier_name', 'supplier_group'],
+      filters: { disabled: 0 },
+      order_by: 'name asc',
+      limit_page_length: 500,
+    }),
+  sendRfq: (version, rows, suppliers, message) =>
+    call(PREFIX + 'sourcing.send_rfq', { version, rows: JSON.stringify(rows), suppliers: JSON.stringify(suppliers), message }),
+  bidForm: (version, rfq, supplier, revise) => call(PREFIX + 'sourcing.bid_form', { version, rfq, supplier, revise: revise || null }),
+  enterBid: (version, rfq, supplier, rates, validTill, submit, revise) =>
+    call(PREFIX + 'sourcing.enter_bid', {
+      version, rfq, supplier, rates: JSON.stringify(rates), valid_till: validTill || null, submit: submit ? 1 : 0, revise: revise || null,
+    }),
+  pullQuotes: (version) => call(PREFIX + 'sourcing.pull_quotes', { version }),
+  selectQuote: (version, rowKey, supplierQuotation) =>
+    call(PREFIX + 'sourcing.select_quote', { version, row_key: rowKey, supplier_quotation: supplierQuotation }),
+  createPurchaseOrders: (version, submit, supplier) =>
+    call(PREFIX + 'sourcing.create_purchase_orders', { version, submit: submit ? 1 : 0, supplier: supplier || null }),
+  settleInternal: (version) => call(PREFIX + 'sourcing.settle_internal', { version }),
 
   getItemName: (item) =>
     call('frappe.client.get_value', { doctype: 'Item', fieldname: 'item_name', filters: item }).then((r) => r?.item_name),

@@ -48,23 +48,40 @@ export function useWorkspace(planName) {
     return task
   }
 
-  async function run(request) {
+  /** Write one Quotation Item column (queued with the row edits so they stay in order). */
+  function setItemField(version, rowKey, field, value) {
+    pending.value += 1
+    const task = chain.then(async () => {
+      saving.value = true
+      try {
+        ws.value = (await api.setItemField(version, rowKey, field, value, shown.value)).workspace
+      } catch (err) {
+        toast.error(readError(err))
+        await load()
+      } finally {
+        pending.value -= 1
+        saving.value = pending.value > 0
+      }
+    })
+    chain = task.catch(() => {})
+    return task
+  }
+
+  /** Revision flow and billing: one request, then the refreshed workspace. Resolves with the result. */
+  async function revisionAction(name, ...args) {
     saving.value = true
     try {
-      ws.value = await request()
-      return true
+      await flush()
+      const result = await api[name](...args, shown.value)
+      ws.value = result.workspace
+      return result
     } catch (err) {
       toast.error(readError(err))
-      return false
+      return null
     } finally {
       saving.value = false
     }
   }
-
-  const freeze = (version) => run(() => api.freeze(version, shown.value))
-  const approve = (version) => run(() => api.approve(version, shown.value))
-  const reopen = (version, reason) => run(() => api.reopen(version, reason, shown.value))
-  const setRole = (version, role) => run(() => api.setRole(version, role, shown.value))
 
   /** Create a version, show it next to the ones already displayed, and start editing it. */
   async function createVersion(args) {
@@ -115,6 +132,9 @@ export function useWorkspace(planName) {
     return [...columns].reverse().find((ver) => ver?.can_edit) || columns[columns.length - 1] || null
   })
 
+  /** Resolves once every queued edit has been written (edits save as you go; Save just waits for them). */
+  const flush = () => chain
+
   const dirty = computed(() => pending.value > 0 || saving.value)
   watch(dirty, (value) => window.parent?.postMessage({ type: 'cp:dirty', dirty: value }, window.location.origin))
 
@@ -125,11 +145,10 @@ export function useWorkspace(planName) {
     saving,
     dirty,
     load,
+    flush,
     send,
-    freeze,
-    approve,
-    reopen,
-    setRole,
+    setItemField,
+    revisionAction,
     createVersion,
     toggleColumn,
     focusOn,

@@ -1,15 +1,11 @@
 <template>
-  <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
-    <div>
-      <h1 class="text-lg font-semibold text-ink-gray-9">Comments</h1>
-      <p class="text-xs text-ink-gray-5">Discuss this plan with your team. Comments are kept with the record.</p>
-    </div>
+  <PageFrame subtitle="Discuss this plan with your team. Comments are kept with the record.">
 
-    <div class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
+    <div class="rounded-xl border border-outline-gray-2 bg-surface-base p-4">
       <textarea
         v-model="draft"
         rows="3"
-        class="w-full rounded-md border border-outline-gray-3 p-2.5 text-sm outline-none focus:border-outline-blue-3"
+        class="cp-input w-full"
         placeholder="Write a comment… (Ctrl+Enter to post)"
         @keydown.ctrl.enter.prevent="post"
         @keydown.meta.enter.prevent="post"
@@ -27,7 +23,7 @@
     <ul v-else class="flex flex-col gap-3">
       <li v-for="comment in comments" :key="comment.name" class="flex gap-3">
         <Avatar :label="comment.owner_full_name" size="md" />
-        <div class="min-w-0 flex-1 rounded-lg border border-outline-gray-2 bg-surface-white px-4 py-3">
+        <div class="min-w-0 flex-1 rounded-xl border border-outline-gray-2 bg-surface-base px-4 py-3">
           <div class="flex items-center gap-2 text-sm">
             <span class="font-semibold text-ink-gray-9">{{ comment.owner_full_name }}</span>
             <span class="text-xs text-ink-gray-5" :title="fullDate(comment.creation)">{{ timeAgo(comment.creation) }}</span>
@@ -44,10 +40,11 @@
         </div>
       </li>
     </ul>
-  </div>
+  </PageFrame>
 </template>
 
 <script setup>
+import PageFrame from '../components/PageFrame.vue'
 import { inject, onMounted, ref } from 'vue'
 import { Avatar, Button, toast } from 'frappe-ui'
 import Icon from '../components/Icon.vue'

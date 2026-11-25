@@ -1,30 +1,30 @@
 <template>
   <div ref="root" class="relative">
     <button
-      class="flex h-8 items-center gap-2 rounded-md border border-outline-gray-3 bg-surface-white px-2.5 text-sm hover:bg-surface-gray-1"
-      :class="open ? 'border-outline-blue-3 bg-surface-blue-2' : ''"
+      class="flex h-8 items-center gap-2 rounded-md bg-surface-gray-2 px-2.5 text-sm transition-colors hover:bg-surface-gray-3"
+      :class="open ? '!bg-surface-gray-3' : ''"
       @click="open = !open"
     >
       <Icon name="layers" :size="14" class="text-ink-gray-6" />
       <template v-if="focusVersion">
         <span class="font-medium text-ink-gray-9">V{{ focusVersion.version_no }}</span>
         <span class="max-w-[150px] truncate text-ink-gray-7">{{ focusVersion.version_name }}</span>
-        <Badge :label="focusVersion.status" :theme="statusTheme(focusVersion.status)" size="sm" />
+        <span class="cp-chip" :class="focusVersion.status === 'Working' ? 'bg-surface-green-2 text-ink-green-8' : 'bg-surface-gray-3 text-ink-gray-7'">{{ focusVersion.status === 'Working' ? 'Editable' : 'Locked' }}</span>
       </template>
       <Icon name="chevdown" :size="12" class="text-ink-gray-5" />
     </button>
 
     <div
       v-if="open"
-      class="absolute right-0 top-10 z-50 w-[340px] rounded-lg border border-outline-gray-2 bg-surface-white p-1.5 shadow-xl"
+      class="fixed inset-x-3 top-14 z-50 rounded-xl border border-outline-gray-2 bg-surface-base p-1.5 shadow-xl md:absolute md:inset-x-auto md:right-0 md:top-10 md:w-[340px]"
     >
-      <div class="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-5">Versions</div>
+      <div class="px-2 pb-1 pt-1 text-[13px] text-ink-gray-5">Versions</div>
       <div class="max-h-[340px] overflow-y-auto">
         <div
           v-for="ver in ordered"
           :key="ver.name"
-          class="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-surface-gray-1"
-          :class="ver.name === focusVersion?.name ? 'bg-surface-blue-2' : ''"
+          class="flex items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-surface-gray-2"
+          :class="ver.name === focusVersion?.name ? 'bg-surface-gray-2' : ''"
         >
           <input
             type="checkbox"
@@ -37,10 +37,11 @@
             <div class="flex items-center gap-1.5">
               <span class="font-medium text-ink-gray-9">V{{ ver.version_no }}</span>
               <span class="truncate text-ink-gray-8">{{ ver.version_name }}</span>
-              <Badge v-if="ver.reference_role" :label="ver.reference_role" theme="blue" size="sm" />
+              
+
               <Badge :label="ver.status" :theme="statusTheme(ver.status)" size="sm" />
             </div>
-            <div class="mt-0.5 text-[11px] text-ink-gray-5">{{ ver.stage }} · {{ ver.purpose }} · {{ fmt.compact(ver.total_cost) }} cost</div>
+            <div class="mt-0.5 text-[11px] text-ink-gray-5">{{ ver.lock_reason || 'Editable' }} · {{ fmt.compact(ver.total_cost) }} cost</div>
           </button>
         </div>
       </div>

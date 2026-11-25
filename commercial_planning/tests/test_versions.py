@@ -27,29 +27,11 @@ class TestVersions(IntegrationTestCase):
 	def role_holder(self, role):
 		return frappe.db.get_value(VERSION, {"planning": self.plan, "reference_role": role}, "name")
 
-	def as_user(self, email, *roles):
-		if not frappe.db.exists("User", email):
-			frappe.get_doc(
-				{"doctype": "User", "email": email, "first_name": "T", "send_welcome_email": 0, "roles": [{"role": r} for r in roles]}
-			).insert()
-		frappe.set_user(email)
-
-	def test_first_version_comes_from_the_plan_created_template(self):
+	def test_first_version_is_an_editable_working_version(self):
 		self.assertEqual(
-			(
-				self.v1.version_no,
-				self.v1.version_name,
-				self.v1.stage,
-				self.v1.purpose,
-				self.v1.status,
-				self.v1.reference_role,
-				self.v1.template,
-			),
-			(1, "Quotation", "Quotation", "Estimate", "Working", "Baseline", "Quotation"),
+			(self.v1.version_no, self.v1.version_name, self.v1.stage, self.v1.status, self.v1.lock_kind or None),
+			(1, "Working", "Quotation", "Working", None),
 		)
-		self.assertEqual(frappe.db.get_value("Commercial Planning", self.plan, "baseline_version"), self.v1.name)
-		templates = set(frappe.get_all("Commercial Version Template", pluck="name"))
-		self.assertTrue({"Quotation", "Sales Order", "Project Budget", "Forecast"} <= templates)
 
 	def test_create_version_copies_the_tree_and_keeps_row_keys(self):
 		line = next(row for row in self.v1.items if row.row_type == "Cost Item")
@@ -81,54 +63,18 @@ class TestVersions(IntegrationTestCase):
 		self.assertFalse(frappe.db.get_value(VERSION, first.name, "reference_role"))
 		self.assertEqual(frappe.db.get_value("Commercial Planning", self.plan, "forecast_version"), second.name)
 
-	def test_budget_needs_approval_and_clears_when_reopened(self):
-		budget = self.make(template="Project Budget")
-		self.assertFalse(budget.reference_role)
-		with self.assertRaises(frappe.PermissionError):
-			version_api.set_role(budget.name, "Budget")  # only an Approved version can become the budget
-		version_api.approve(budget.name)
-		approved = frappe.get_doc(VERSION, budget.name)
-		self.assertEqual((approved.status, approved.reference_role), ("Approved", "Budget"))
-		self.assertTrue(approved.approved_by)
-		self.assertEqual(frappe.db.get_value("Commercial Planning", self.plan, "budget_version"), budget.name)
-		with self.assertRaises(frappe.PermissionError):
-			planning_api.apply_ops(budget.name, [{"op": "add", "values": {"description": "late"}}])
-		with self.assertRaises(frappe.ValidationError):
-			frappe.get_doc(VERSION, budget.name).save()
-		version_api.reopen(budget.name, "price change")
-		reopened = frappe.get_doc(VERSION, budget.name)
-		self.assertEqual(reopened.status, "Working")
-		self.assertFalse(reopened.reference_role or reopened.approved_by)
-		self.assertFalse(frappe.db.get_value("Commercial Planning", self.plan, "budget_version"))
-
-	def test_summary_uses_reference_versions(self):
+	def test_summary_compares_against_the_last_round(self):
 		lines = [row for row in self.v1.items if row.row_type == "Cost Item"]
 		planning_api.apply_ops(
 			self.v1.name, [{"op": "update", "row_key": row.row_key, "values": {"unit_cost": 100}} for row in lines]
 		)
-		baseline_cost = flt(frappe.db.get_value(VERSION, self.v1.name, "total_cost"))
-		forecast = self.make(template="Forecast")
-		planning_api.apply_ops(forecast.name, [{"op": "update", "row_key": lines[0].row_key, "values": {"unit_cost": 150}}])
+		round_cost = flt(frappe.db.get_value(VERSION, self.v1.name, "total_cost"))
+		self.quotation.reload()
+		self.quotation.submit()  # V1 becomes Round 1
+		v2 = self.make(version_name="Negotiation")
+		planning_api.apply_ops(v2.name, [{"op": "update", "row_key": lines[0].row_key, "values": {"unit_cost": 150}}])
 		payload = planning_api.get_workspace(self.plan)
-		self.assertEqual([c["short"] for c in payload["columns"]], ["V1", "V2"])  # baseline + forecast references
-		costs = payload["summary"]["costs"]
-		self.assertEqual((costs["quotation"], costs["forecast"], costs["budget"]), (baseline_cost, baseline_cost + 50, None))
-		self.assertIsNone(payload["summary"]["variance"]["forecast_vs_budget"])
-
-	def test_editors_follow_the_version_template(self):
-		forecast = self.make(template="Forecast")
-		self.as_user("pm.only@example.com", "Projects Manager")
-		versions = {v["name"]: v for v in planning_api.get_workspace(self.plan)["versions"]}
-		self.assertTrue(versions[forecast.name]["can_edit"])  # Forecast: planner + projects manager
-		self.assertFalse(versions[self.v1.name]["can_edit"])  # Quotation: planner only
-		with self.assertRaises(frappe.PermissionError):
-			planning_api.apply_ops(self.v1.name, [{"op": "add", "values": {"description": "x"}}])
-		planning_api.apply_ops(forecast.name, [{"op": "add", "values": {"description": "pm line", "unit_cost": 1}}])
-
-	def test_planner_cannot_approve_or_freeze_a_budget(self):
-		budget = self.make(template="Project Budget")
-		self.as_user("planner.only@example.com", "Commercial Planner")
-		with self.assertRaises(frappe.PermissionError):
-			version_api.approve(budget.name)
-		with self.assertRaises(frappe.PermissionError):
-			version_api.freeze(budget.name)  # this template requires Management approval
+		self.assertEqual([c["short"] for c in payload["columns"]], ["Round 1", "V2"])  # reference + latest
+		summary = payload["summary"]
+		self.assertEqual((summary["reference"]["label"], summary["reference"]["cost"], summary["won"]), ("Round 1", round_cost, False))
+		self.assertEqual([h["label"] for h in summary["history"]], ["Round 1"])

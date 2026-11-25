@@ -17,29 +17,21 @@ EDITABLE_FIELDS = (
 	"supplier",
 	"vendor_quote",
 	"qty",
+	"days",
+	"pages",
+	"rate",
 	"uom",
 	"unit_cost",
 	"cost_currency",
 	"exchange_rate",
 	"adj_mode",
 	"adj_percent",
+	"pricing_basis",
 )
+# a client line's own fields: they are the Quotation item, so they change only where the Quotation allows it
+CLIENT_FIELDS = ("description", "item_code", "qty", "days", "pages", "rate")
 
 
-LINE_FIELDS = (
-	"description",
-	"notes",
-	"cost_type",
-	"cost_source",
-	"item_code",
-	"supplier",
-	"vendor_quote",
-	"qty",
-	"uom",
-	"unit_cost",
-	"cost_currency",
-	"exchange_rate",
-)
 
 
 def new_row_key():
@@ -52,8 +44,11 @@ def default_line_values(category):
 		"row_type": COST_ITEM,
 		"row_key": new_row_key(),
 		"description": category.description,
+		"item_code": category.item_code,  # the first line is the quoted item itself: RFQs and POs need a real item
 		"qty": category.qty or 1,
+		"days": category.days or 1,
 		"uom": category.uom,
+		"pricing_basis": "Manual",
 	}
 
 
@@ -62,11 +57,22 @@ class Tree:
 
 	def __init__(self, revision):
 		self.revision = revision
+		self._sync = None
 		self.children = {}
 		self.rows = {}
 		for row in revision.items:
 			self.rows[row.row_key] = row
 			self.children.setdefault(row.parent_key or "", []).append(row)
+
+	def client_editable(self, row):
+		"""Client fields of a linked client line are editable only while its draft Quotation syncs."""
+		if not any(link.row_key == row.row_key for link in self.revision.item_links):
+			return True
+		if self._sync is None:
+			from commercial_planning.services import quote_sync
+
+			self._sync = bool(quote_sync.active_quotation(self.revision))
+		return self._sync
 
 	def get(self, row_key):
 		row = self.rows.get(row_key)
@@ -119,17 +125,16 @@ class Tree:
 		self.siblings(row.parent_key).remove(row)
 
 	def check_parent(self, row, parent_key):
-		if not parent_key:
-			if self.height(row) > MAX_DEPTH:
-				frappe.throw(_("Maximum nesting depth is {0}").format(MAX_DEPTH))
+		"""Two levels only: a category (a quotation line) sits at the top; cost lines sit inside a category."""
+		if row.row_type == CATEGORY:
+			if parent_key:
+				frappe.throw(_("Categories stay at the top level; only lines go inside a category"))
 			return
+		if not parent_key:
+			frappe.throw(_("A line belongs inside a category"))
 		parent = self.get(parent_key)
-		if parent.row_type != CATEGORY:
-			frappe.throw(_("Rows can only be placed under a Category"))
-		if parent in self.subtree(row):
-			frappe.throw(_("A row cannot be moved into itself"))
-		if self.depth(parent_key) + self.height(row) > MAX_DEPTH:
-			frappe.throw(_("Maximum nesting depth is {0}").format(MAX_DEPTH))
+		if parent.row_type != CATEGORY or parent.parent_key:
+			frappe.throw(_("Lines can only be placed inside a category"))
 
 
 def apply_ops(revision, ops):
@@ -141,12 +146,18 @@ def apply_ops(revision, ops):
 		if not handler:
 			frappe.throw(_("Unknown operation {0}").format(op.get("op")))
 		handler(revision, tree, op, created)
+	# what the client signed comes first; lines added after agreement stay below the divider
+	tree.children[""] = sorted(tree.siblings(""), key=lambda row: bool(row.after_agreement))
 	tree.flush()
+	fill_lta(revision)
 	recalculate(revision)
+	from commercial_planning.services import selling
+
+	selling.refresh_selling(revision)
 	return created
 
 
-CATEGORY_CALCULATED = ("qty", "uom", "unit_cost")
+CATEGORY_CALCULATED = ("uom", "unit_cost")
 
 
 def clean_values(values):
@@ -154,16 +165,21 @@ def clean_values(values):
 
 
 def reject_calculated(row, values):
-	"""A category's qty, uom and unit cost come from the document item and its lines; they are not typed."""
+	"""A category's UOM and unit cost come from the document item and its lines; they are not typed."""
 	if row.row_type == CATEGORY and any(key in values for key in CATEGORY_CALCULATED):
-		frappe.throw(_("Quantity, UOM and unit cost of a category are calculated; edit its lines instead"))
+		frappe.throw(_("UOM and unit cost of a client line are calculated; edit its cost lines instead"))
 
 
 def op_add(revision, tree, op, created):
 	values = clean_values(op.get("values"))
 	if values.get("row_type") == CATEGORY:
 		values = {key: value for key, value in values.items() if key not in CATEGORY_CALCULATED}
-	row = revision.append("items", {"row_type": COST_ITEM, "qty": 1, **values})
+	days = event_days(revision)
+	if values.get("row_type") == CATEGORY and revision.is_revision:
+		# added after the Sales Order: below the "Added after agreement" divider, free until billed
+		values.update(after_agreement=1, rate=flt(values.get("rate")))
+		op = {**op, "parent_key": "", "before_key": None}
+	row = revision.append("items", {"row_type": COST_ITEM, "qty": 1, "days": days, **values})
 	row.row_key = new_row_key()
 	tree.rows[row.row_key] = row
 	tree.attach(row, op.get("parent_key"), op.get("before_key"))
@@ -191,11 +207,42 @@ def op_update(revision, tree, op, created):
 		change_type(revision, tree, row, new_type)
 	if row.row_type == CATEGORY:
 		reject_calculated(row, values)
+		if any(key in values for key in CLIENT_FIELDS) and row.variation_order:
+			frappe.throw(_("{0} is billed on {1}: change it there").format(row.description, row.variation_order))
+		if any(key in values for key in CLIENT_FIELDS) and not tree.client_editable(row):
+			frappe.throw(_("{0} follows {1} {2}, which can no longer be edited. Make the change there, or in a new version").format(
+				row.description, revision.source_doctype, revision.source_name))
+		row.changed_in_quotation = 0
+	reject_typed_quote_cost(row, values)
 	previous_name = row.description
 	row.update(values)
 	normalise_row(row)
 	if row.row_type == CATEGORY and "description" in values:
 		rename_first_line(tree, row, previous_name)
+
+
+def reject_typed_quote_cost(row, values):
+	"""A Requirement line is priced only by the quote picked in Sourcing, an LTA line by the LTA price list;
+	typing a cost would bypass them."""
+	basis = values.get("pricing_basis", row.pricing_basis)
+	if basis == "Requirement" and flt(values.get("unit_cost")):
+		frappe.throw(_("{0} is priced from its RFQ. Select a supplier quote in Sourcing, or change Cost From to Manual").format(row.description))
+	if basis == "LTA" and flt(values.get("unit_cost")):
+		frappe.throw(_("{0} takes its cost from the LTA price list. Change Cost From to Manual to type a cost").format(row.description))
+
+
+def fill_lta(revision):
+	"""LTA lines take their unit cost from the LTA price list (supplier-specific price first); 0 when it has none."""
+	lines = [row for row in revision.items if row.row_type == COST_ITEM and row.pricing_basis == "LTA"]
+	price_list = lines and frappe.get_cached_doc("Commercial Planning Settings").get("lta_price_list")
+	if not price_list:
+		return
+	from commercial_planning.services.sourcing import lta_rate
+
+	for row in lines:
+		rate = lta_rate(price_list, row.item_code, row.supplier)
+		row.unit_cost, row.exchange_rate = flt(rate), 1
+		row.cost_source = "LTA Price" if rate is not None else None
 
 
 def rename_first_line(tree, category, previous_name):
@@ -206,25 +253,19 @@ def rename_first_line(tree, category, previous_name):
 		first.description = category.description
 
 
+def event_days(revision):
+	"""Plan-level default days for new lines, else the Settings default (1 when unset)."""
+	return (
+		flt(frappe.db.get_value("Commercial Planning", revision.planning, "event_days"))
+		or flt(frappe.db.get_single_value("Commercial Planning Settings", "default_event_days"))
+		or 1
+	)
+
+
 def change_type(revision, tree, row, new_type):
-	if row.row_type == CATEGORY and tree.siblings(row.row_key):
-		frappe.throw(_("Move or delete the rows under {0} before changing its type").format(row.description))
-	if new_type == CATEGORY:
-		demote_to_first_line(revision, tree, row)
-
-
-def demote_to_first_line(revision, tree, row):
-	"""Turn a Cost Item into a Category; its own cost moves into a first child line so totals are kept."""
-	if tree.depth(row.row_key) >= MAX_DEPTH:
-		frappe.throw(_("Maximum nesting depth is {0}").format(MAX_DEPTH))
-	line = revision.append("items", {field: row.get(field) for field in LINE_FIELDS})
-	line.row_type = COST_ITEM
-	line.row_key = new_row_key()
-	tree.rows[line.row_key] = line
-	for field in ("unit_cost", "supplier", "vendor_quote", "cost_source", "cost_type", "notes"):
-		row.set(field, None if field not in ("unit_cost",) else 0)
-	row.row_type = CATEGORY
-	tree.attach(line, row.row_key)
+	# Two levels only: a line cannot become a category (that would nest one) and a category cannot become a line.
+	if CATEGORY in (row.row_type, new_type):
+		frappe.throw(_("A category and a line cannot be turned into each other; add a category or a line instead"))
 
 
 def op_delete(revision, tree, op, created):
@@ -241,6 +282,9 @@ def op_delete(revision, tree, op, created):
 def op_move(revision, tree, op, created):
 	row = tree.get(op["row_key"])
 	tree.check_parent(row, op.get("parent_key"))
+	target = tree.rows.get(op.get("before_key") or "")
+	if row.row_type == CATEGORY and target is not None and bool(target.after_agreement) != bool(row.after_agreement):
+		frappe.throw(_("Lines added after agreement stay below the divider"))
 	tree.detach(row)
 	tree.attach(row, op.get("parent_key"), op.get("before_key"))
 
@@ -289,12 +333,8 @@ def op_duplicate(revision, tree, op, created):
 
 
 def op_split(revision, tree, op, created):
-	"""Turn a Cost Item into a Category keeping its row_key so node-level comparison survives."""
-	row = tree.get(op["row_key"])
-	if row.row_type != COST_ITEM:
-		frappe.throw(_("Only a Cost Item can be split"))
-	demote_to_first_line(revision, tree, row)
-	normalise_row(row)
+	"""Splitting a line made it a sub-category; the plan keeps two levels, so add lines to the category instead."""
+	frappe.throw(_("Lines cannot be split. Add another line to the category instead"))
 
 
 def op_sync_source(revision, tree, op, created):
@@ -345,6 +385,8 @@ OPERATIONS = {
 
 
 def normalise_row(row):
+	if row.row_type == COST_ITEM and not row.pricing_basis:
+		row.pricing_basis = "Manual"
 	if row.row_type != ADJUSTMENT:
 		row.adj_mode = None
 		row.adj_percent = 0
@@ -364,19 +406,21 @@ def recalculate(revision):
 
 
 def derive_category_fields(revision, view):
-	"""Category qty/uom follow the document item (or the first line); unit cost = total / qty."""
+	"""A client line's UOM follows its first line when no document item sets it; unit cost = cost per
+	unit per day (comparable with its rate)."""
 	linked = {link.row_key for link in revision.item_links}
 	for row in revision.items:
 		if row.row_type != CATEGORY:
 			continue
 		first = next(iter(view.siblings(row.row_key)), None)
-		if row.row_key not in linked and first and first.row_type == COST_ITEM:
-			row.qty, row.uom = first.qty, first.uom
-		row.unit_cost = flt(row.cost_amount) / flt(row.qty) if flt(row.qty) else 0
+		if row.row_key not in linked and first and first.row_type == COST_ITEM and not row.uom:
+			row.uom = first.uom
+		units = flt(row.qty) * (flt(row.days) or 1) * (flt(row.pages) or 1)
+		row.unit_cost = flt(row.cost_amount) / units if units else 0
 
 
 def leaf_cost(row):
-	return flt(row.qty) * flt(row.unit_cost) * (flt(row.exchange_rate) or 1)
+	return flt(row.qty) * (flt(row.days) or 1) * flt(row.unit_cost) * (flt(row.exchange_rate) or 1)
 
 
 def group_cost(tree, parent_key):

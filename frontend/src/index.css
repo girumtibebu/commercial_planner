@@ -11,13 +11,58 @@ body,
   margin: 0;
 }
 
+/* Checkboxes as frappe-ui's Checkbox: small rounded square, gray border; dark fill with a white tick when on. */
+input[type='checkbox'] {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border: 1px solid var(--outline-gray-4, #c7c7c7);
+  border-radius: 4px;
+  background-color: var(--surface-base, #fff);
+  background-image: none;
+  color: transparent;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+input[type='checkbox']:hover {
+  border-color: var(--outline-gray-5, #999);
+}
+input[type='checkbox']:checked,
+input[type='checkbox']:indeterminate {
+  border-color: var(--ink-gray-9, #171717);
+  background-color: var(--ink-gray-9, #171717);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 10px;
+}
+input[type='checkbox']:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+input[type='checkbox']:focus,
+input[type='checkbox']:focus-visible {
+  outline: none;
+  --tw-ring-color: transparent;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+}
+input[type='checkbox']:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .sheet {
   font-variant-numeric: tabular-nums;
+  /* keep the grid's sticky z-indexes inside it, so dialogs and popups always paint above the grid */
+  isolation: isolate;
 }
 
 .sheet-cell {
-  @apply border-b border-outline-gray-1;
-  height: 36px;
+  @apply border-b border-r border-outline-gray-2;
+  height: 32px;
   display: flex;
   align-items: center;
   padding: 0 12px;
@@ -29,24 +74,109 @@ body,
   scroll-margin-bottom: 44px;
 }
 
+/* No frames: the selected cell and the cell being edited are shown by a soft gray tint only. */
 .sheet-cell.is-active {
-  box-shadow: inset 0 0 0 2px #2d95f0;
+  background-color: rgba(0, 0, 0, 0.035) !important;
   z-index: 3;
 }
 
+/* the selected editable cell: an inset outline, so it shows on any row colour */
+.sheet-cell.is-outlined {
+  outline: 2px solid var(--outline-gray-3, oklch(83% 0 0));
+  outline-offset: -2px;
+  z-index: 3;
+}
+
+.sheet-cell.is-editing {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  z-index: 4;
+  overflow: visible;
+  font-weight: 400;
+}
+
+/* frappe-ui's base form styles give every <input> a border, radius, padding and a blue focus ring:
+   inside the grid the input must be bare text. */
+.sheet .sheet-cell input,
+.sheet .sheet-cell input:focus,
+.sheet .sheet-cell input:focus-visible,
+.sheet .sheet-cell input:hover {
+  appearance: none;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+  caret-color: #171717;
+}
+.sheet-cell.is-editing input::selection {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.col-resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+}
+.col-resize::after {
+  content: '';
+  position: absolute;
+  top: 25%;
+  right: 2px;
+  width: 2px;
+  height: 50%;
+  border-radius: 1px;
+  background: transparent; /* shows on header hover, so the header has no stray lines */
+}
+
+/* Row drag & drop */
+.drag-grip {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.drag-grip.is-visible {
+  opacity: 1;
+}
+.sheet-cell.is-dragging {
+  opacity: 0.4;
+}
+.sheet-cell.drop-before {
+  box-shadow: inset 0 2px 0 #404040;
+}
+.sheet-cell.drop-after {
+  box-shadow: inset 0 -2px 0 #404040;
+}
+.sheet-cell {
+  transition: background-color 0.1s;
+}
+.sheet-head:hover > .col-resize::after,
+.col-resize:hover::after {
+  background: #7c7c7c;
+}
+
 .sheet-cell.is-row-active {
-  box-shadow: inset 3px 0 0 #2d95f0;
+  box-shadow: inset 2px 0 0 #7c7c7c;
 }
 
 .sheet-cell.is-row-active.is-active {
-  box-shadow: inset 0 0 0 2px #2d95f0;
+  box-shadow: inset 2px 0 0 #7c7c7c;
 }
 
-.sheet-frozen {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.06);
+/* the first column stays in view on tablets and larger; on a phone the whole grid scrolls sideways */
+@media (min-width: 768px) {
+  .sheet-frozen {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    box-shadow: 1px 0 0 rgba(0, 0, 0, 0.06);
+  }
 }
 
 .sheet-cell input {
@@ -58,6 +188,112 @@ body,
   text-align: inherit;
 }
 
+/* Shared component classes live in the components layer, so a utility on the same element
+   (w-20, text-right, a colour) still wins over them. */
+@layer components {
+/* Form fields as frappe-ui draws them: filled gray, no visible border; white with a soft ring when focused. */
+.cp-input {
+  @apply h-8 w-full rounded-lg border border-transparent bg-surface-gray-2 px-2.5 text-sm text-ink-gray-8 outline-none transition-colors;
+  @apply placeholder:text-ink-gray-4 hover:bg-surface-gray-3;
+  @apply disabled:cursor-not-allowed disabled:bg-surface-gray-1 disabled:text-ink-gray-5;
+}
+.cp-input:focus,
+.cp-input:focus-visible,
+.cp-input:focus-within {
+  outline: none;
+  --tw-ring-color: transparent; /* frappe-ui's form base draws a blue ring on focus */
+  @apply border-outline-gray-4 bg-surface-base;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+.cp-input.cp-sm {
+  @apply h-7 rounded-md px-2 text-[13px];
+}
+textarea.cp-input {
+  @apply h-auto py-2 leading-normal;
+}
+/* selects: the ⇕ chevron of frappe-ui's Select */
+select.cp-input {
+  @apply cursor-pointer py-0 pr-8 leading-normal;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23525252' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 14px;
+}
+
+/* Cards, stats and tables, as on the frappe-ui dashboards. */
+.cp-card {
+  @apply rounded-xl border border-outline-gray-2 bg-surface-base;
+}
+.cp-stat {
+  @apply flex min-w-0 flex-col rounded-xl border border-outline-gray-2 bg-surface-base px-5 py-4;
+}
+.cp-stat-label {
+  @apply truncate text-sm text-ink-gray-6;
+}
+.cp-stat-value {
+  @apply mt-2 truncate text-xl font-semibold tabular-nums text-ink-gray-9;
+}
+.cp-stat-sub {
+  @apply mt-1.5 truncate text-sm text-ink-gray-5;
+}
+.cp-section-title {
+  @apply text-base font-medium text-ink-gray-8;
+}
+.cp-table {
+  @apply w-full text-sm tabular-nums;
+}
+.cp-table thead tr {
+  @apply bg-surface-gray-1 text-ink-gray-6;
+}
+.cp-table th {
+  @apply px-4 py-2.5 font-normal;
+}
+.cp-table td {
+  @apply px-4 py-3;
+}
+.cp-table tbody tr {
+  @apply border-t border-outline-gray-1;
+}
+
+/* Small status pill: pricing basis, quote status. */
+.cp-chip {
+  @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-px text-[11px] font-medium;
+}
+}
+
+/* In-grid select editor: fills the cell like the text editor does. */
+.sheet-cell select {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  outline: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
 .cp-scroll {
   scrollbar-width: thin;
+}
+
+/* Touch screens have no hover: the row menu stays visible; drag needs a mouse, so Move up / down in the menu take over. */
+@media (hover: none) {
+  .row-menu {
+    opacity: 1 !important;
+  }
+  .drag-grip {
+    display: none;
+  }
+}
+
+/* vertical lines between columns in the header too, so header and rows line up */
+.sheet-head {
+  @apply border-r border-outline-gray-2;
 }

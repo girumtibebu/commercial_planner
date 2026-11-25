@@ -17,6 +17,13 @@
   "vendor_quote",
   "cost_section",
   "qty",
+  "days",
+  "pages",
+  "rate",
+  "off_quotation",
+  "changed_in_quotation",
+  "after_agreement",
+  "variation_order",
   "uom",
   "unit_cost",
   "cost_currency",
@@ -26,7 +33,20 @@
   "result_section",
   "cost_amount",
   "selling_amount",
-  "source_rate"
+  "source_rate",
+  "sourcing_section",
+  "client_pricing",
+  "pricing_basis",
+  "markup_pct",
+  "cost_center",
+  "column_break_src",
+  "rfq",
+  "rfq_item",
+  "rfq_items",
+  "supplier_quotation",
+  "purchase_order",
+  "po_item",
+  "settlement"
  ],
  "fields": [
   {
@@ -177,6 +197,141 @@
    "options": "currency",
    "read_only": 1,
    "hidden": 1
+  },
+  {
+   "fieldname": "sourcing_section",
+   "fieldtype": "Section Break",
+   "label": "Sourcing"
+  },
+  {
+   "fieldname": "client_pricing",
+   "fieldtype": "Select",
+   "label": "Client Price",
+   "options": "\nPackage\nCost plus",
+   "description": "Top-level category. Package: the quoted price is fixed (price list); the lines are the internal breakdown. Cost plus: the client price is the lines' cost plus the markup."
+  },
+  {
+   "fieldname": "pricing_basis",
+   "fieldtype": "Select",
+   "label": "Cost From",
+   "options": "\nLTA\nRequirement\nManual",
+   "description": "Cost line. LTA: fixed agreed price from the LTA price list. Requirement: priced only by the quote selected from an RFQ. Manual: an estimate typed in."
+  },
+  {
+   "fieldname": "markup_pct",
+   "fieldtype": "Percent",
+   "label": "Markup %",
+   "description": "Top-level Cost plus category: Update Quotation sets the client price to cost plus this markup."
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_src",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rfq",
+   "fieldtype": "Link",
+   "label": "Request for Quotation",
+   "options": "Request for Quotation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rfq_item",
+   "fieldtype": "Data",
+   "label": "RFQ Item",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "rfq_items",
+   "fieldtype": "Small Text",
+   "label": "RFQ Items",
+   "description": "Every RFQ row this line was sent on (comma separated): bids from all of them are compared.",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "supplier_quotation",
+   "fieldtype": "Link",
+   "label": "Supplier Quotation",
+   "options": "Supplier Quotation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "purchase_order",
+   "fieldtype": "Link",
+   "label": "Purchase Order",
+   "options": "Purchase Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "po_item",
+   "fieldtype": "Data",
+   "label": "PO Item",
+   "description": "The Purchase Order row raised for this line: invoices against it become this line's actual cost.",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "settlement",
+   "fieldtype": "Link",
+   "label": "Settlement",
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "days",
+   "fieldtype": "Float",
+   "label": "Days",
+   "default": "1",
+   "description": "Qty x days x unit cost. Matches Number of Days on the document item."
+  },
+  {
+   "fieldname": "pages",
+   "fieldtype": "Float",
+   "label": "Pages",
+   "default": "1",
+   "description": "Matches Number of Pages on the document item."
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "label": "Client Rate",
+   "options": "cost_currency",
+   "description": "Client price per unit per day (the document item's rate)."
+  },
+  {
+   "fieldname": "off_quotation",
+   "fieldtype": "Check",
+   "label": "Not on Quotation",
+   "read_only": 1,
+   "description": "Its item was removed from the Quotation. Cost work is kept until the line is deleted or the item returns."
+  },
+  {
+   "fieldname": "changed_in_quotation",
+   "fieldtype": "Check",
+   "label": "Updated in Quotation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "after_agreement",
+   "fieldtype": "Check",
+   "label": "Added After Agreement",
+   "read_only": 1,
+   "description": "A client line added in a budget revision: a free extra, or billed as a variation"
+  },
+  {
+   "fieldname": "variation_order",
+   "fieldtype": "Link",
+   "label": "Variation Sales Order",
+   "options": "Sales Order",
+   "read_only": 1
   }
  ],
  "permissions": [],

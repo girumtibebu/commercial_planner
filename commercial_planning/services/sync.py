@@ -5,6 +5,7 @@ import frappe
 from frappe.utils import flt
 
 from commercial_planning.services import selling
+from commercial_planning.services.quote_sync import UNIT_FIELDS, factor, has_unit_fields, units_from_item
 from commercial_planning.services import version as version_service
 
 ITEM_DOCTYPE = {"Quotation": "Quotation Item", "Sales Order": "Sales Order Item"}
@@ -19,9 +20,12 @@ def source_items(revision):
 	if not doctype or not revision.source_name:
 		return doctype, []
 	filters = {"parent": revision.source_name, "parenttype": revision.source_doctype}
-	if frappe.get_meta(doctype).has_field("is_alternative"):
-		filters["is_alternative"] = 0
-	return doctype, frappe.get_all(doctype, filters=filters, fields=ITEM_FIELDS, order_by="idx asc")
+	meta = frappe.get_meta(doctype)
+	for flag in ("is_alternative", "is_section"):
+		if meta.has_field(flag):
+			filters[flag] = 0
+	fields = ITEM_FIELDS + (list(UNIT_FIELDS) if has_unit_fields(doctype) else [])
+	return doctype, frappe.get_all(doctype, filters=filters, fields=fields, order_by="idx asc")
 
 
 def linked_categories(revision, doctype, live):
@@ -41,8 +45,8 @@ def linked_categories(revision, doctype, live):
 
 def describe_changes(row, item, selling_live):
 	changes = {}
-	if flt(row.qty) != flt(item.qty):
-		changes["qty"] = [row.qty, item.qty]
+	if abs(flt(row.qty) * factor(row) - flt(item.qty)) > TOLERANCE:
+		changes["qty"] = [flt(row.qty) * factor(row), item.qty]
 	if (row.uom or "") != (item.uom or ""):
 		changes["uom"] = [row.uom, item.uom]
 	if abs(flt(row.selling_amount) - selling_live) > TOLERANCE:
@@ -104,20 +108,23 @@ def refresh_rows(revision, tree_view, only=None):
 		if only and row_key not in only:
 			continue
 		item = row_items[0]
-		follow_first_line(tree_view, category, item)
-		category.qty, category.uom = item.qty, item.uom
+		qty, days, pages = units_from_item(item, doctype)
+		follow_first_line(tree_view, category, qty, days, item)
+		category.update({"qty": qty, "days": days, "pages": pages, "uom": item.uom, "rate": item.rate})
 		category.source_rate = version_service.source_rate(item)
 		touched.add(row_key)
 	selling.refresh_selling(revision, touched)
 
 
-def follow_first_line(tree_view, category, item):
+def follow_first_line(tree_view, category, qty, days, item):
 	lines = tree_view.siblings(category.row_key)
 	first = lines[0] if lines else None
 	if not first or first.row_type != "Cost Item":
 		return
 	if flt(first.qty) == flt(category.qty):
-		first.qty = item.qty
+		first.qty = qty
+	if flt(first.days or 1) == flt(category.days or 1):
+		first.days = days
 	if (first.uom or "") == (category.uom or ""):
 		first.uom = item.uom
 	if abs(flt(first.unit_cost) - flt(category.source_rate)) <= TOLERANCE:

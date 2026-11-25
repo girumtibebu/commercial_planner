@@ -21,8 +21,8 @@
 import { computed } from 'vue'
 import { Button } from 'frappe-ui'
 
-const props = defineProps({ status: Object, editable: Boolean, source: String, fmt: Object })
-defineEmits(['add', 'refresh', 'newversion'])
+const props = defineProps({ status: Object, editable: Boolean, source: String, fmt: Object, synced: Boolean })
+defineEmits(['add', 'refresh', 'newversion', 'sync'])
 
 const LABELS = { qty: 'qty', uom: 'unit', selling: 'selling' }
 
@@ -42,6 +42,14 @@ const needsNewVersion = computed(() => Boolean(props.status?.new_items.length ||
 const notices = computed(() => {
   const status = props.status
   if (!status || status.in_sync) return []
+  if (props.synced) {
+    // a draft Quotation's changes wait here until the planner takes them
+    const parts = []
+    if (status.new_items.length) parts.push(`${status.new_items.length} new: ${status.new_items.map((item) => item.label).join(', ')}`)
+    if (status.removed_items.length) parts.push(`${status.removed_items.length} removed: ${status.removed_items.map((item) => item.label).join(', ')}`)
+    if (status.changes.length) parts.push(status.changes.map(describe).join(' · '))
+    return [{ key: 'sync', text: `${props.source} changed: ${parts.join('; ')}.`, action: 'Sync now', event: 'sync' }]
+  }
   const list = []
   const added = status.new_items
   if (added.length) {

@@ -9,14 +9,12 @@
     v-if="ws"
     v-model="createOpen"
     :versions="ws.versions"
-    :templates="ws.templates"
-    :stages="ws.stages"
-    :purposes="ws.purposes"
     :default-from="focusVersion?.name"
     :preset="createFrom"
     :apply-changes="createApply"
     @create="onCreate"
   />
+  <SettingsDialog v-model="settingsOpen" />
   <ToastProvider />
 </template>
 
@@ -26,6 +24,7 @@ import { useRouter } from 'vue-router'
 import { ToastProvider } from 'frappe-ui'
 import AppShell from './components/AppShell.vue'
 import CreateVersionDialog from './components/CreateVersionDialog.vue'
+import SettingsDialog from './components/SettingsDialog.vue'
 import { api } from './api'
 import { makeFormatter } from './format'
 import { useWorkspace } from './useWorkspace'
@@ -66,7 +65,15 @@ function goToDesk() {
   window.location.href = target ? deskPath(target.doctype, target.name) : '/desk'
 }
 
-provide('cp', { planName, origin, fmt, openCreate, goToDesk, deskPath, ...workspace })
+/** Linked documents open in Desk, in a new tab. */
+function openPanel(doctype, name) {
+  window.open(deskPath(doctype, name), '_blank')
+}
+
+const settingsOpen = ref(false)
+const openSettings = () => (settingsOpen.value = true)
+
+provide('cp', { planName, origin, fmt, openCreate, goToDesk, deskPath, openPanel, openSettings, ...workspace })
 
 onMounted(async () => {
   await load()

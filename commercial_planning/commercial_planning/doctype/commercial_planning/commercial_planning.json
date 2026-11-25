@@ -11,6 +11,7 @@
   "column_break_a",
   "company",
   "currency",
+  "event_days",
   "status",
   "current_stage",
   "created_from",
@@ -196,6 +197,13 @@
    "fieldname": "notes",
    "fieldtype": "Text",
    "label": "Notes"
+  },
+  {
+   "fieldname": "event_days",
+   "fieldtype": "Float",
+   "label": "Event Days",
+   "default": "1",
+   "description": "Pre-fills Days on new lines."
   }
  ],
  "permissions": [

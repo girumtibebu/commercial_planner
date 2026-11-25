@@ -1,0 +1,75 @@
+{
+ "doctype": "DocType",
+ "name": "Commercial Planning Column",
+ "module": "Commercial Planning",
+ "engine": "InnoDB",
+ "istable": 1,
+ "editable_grid": 1,
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "field_order": [
+  "column_key",
+  "label",
+  "width",
+  "applies_to",
+  "column_break_a",
+  "editable",
+  "shown_by_default"
+ ],
+ "fields": [
+  {
+   "fieldname": "column_key",
+   "fieldtype": "Data",
+   "label": "Source",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 3,
+   "description": "A planner field (description, qty, days, rate, unit_cost, cost, delta, supplier, basis, ordered, spent, left, selling, profit, margin, pages, uom) or a Quotation Item field name, such as a custom field."
+  },
+  {
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "label": "Label",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "width",
+   "fieldtype": "Int",
+   "label": "Width (px)",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "applies_to",
+   "fieldtype": "Select",
+   "label": "Applies To",
+   "options": "Both\nClient lines\nCost lines",
+   "default": "Both",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "column_break_a",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "editable",
+   "fieldtype": "Check",
+   "label": "Editable",
+   "in_list_view": 1,
+   "columns": 1,
+   "description": "For Quotation Item fields: edited in the planner and written to the draft Quotation."
+  },
+  {
+   "fieldname": "shown_by_default",
+   "fieldtype": "Check",
+   "label": "Shown by Default",
+   "default": "1",
+   "in_list_view": 1,
+   "columns": 1
+  }
+ ]
+}
